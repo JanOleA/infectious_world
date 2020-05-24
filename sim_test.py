@@ -20,13 +20,13 @@ workend_common_chance = 0.05
 home_common_chance = 0.005
 infection_chance = 0.1
 infection_length = 7
-save_anim = False
+save_anim = True
 
 im = Image.open("mixedmap_half.png")
 
 object_infection_modifiers = {}
 object_infection_modifiers["park"] = 1
-object_infection_modifiers["road"] = 6
+object_infection_modifiers["road"] = 4
 object_infection_modifiers["house"] = 3
 object_infection_modifiers["work"] = 1.2
 object_infection_modifiers["common"] = 1.5
