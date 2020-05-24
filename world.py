@@ -18,7 +18,8 @@ class World:
                  home_common_chance = 0.005,
                  infection_chance = 0.1,
                  initial_infected = 10,
-                 infection_length = 2):
+                 infection_length = 2,
+                 object_infection_modifiers = None):
 
         in_map = in_map[::-1]
         self._image_map = in_map
@@ -34,6 +35,15 @@ class World:
         self._initial_infected = initial_infected
         self._infection_length_days = infection_length
         self._infection_length_frames = infection_length*day_length
+
+        if object_infection_modifiers is None:
+            object_infection_modifiers = {}
+            object_infection_modifiers["park"] = 1
+            object_infection_modifiers["road"] = 1
+            object_infection_modifiers["house"] = 1
+            object_infection_modifiers["work"] = 1
+            object_infection_modifiers["common"] = 1
+        self._object_infection_modifiers = object_infection_modifiers
 
         self._map_define_types = ["p", "r", "h", "w", "c"]
         self._map_define_colors = np.array([[28,167,0], # park, green
@@ -82,19 +92,24 @@ class World:
                 char = self._map_define_types[argmin]
 
                 if char == "r":
-                    new_object = Road(x, y, infection_chance_modifier=1)
+                    inf_mod = self._object_infection_modifiers["road"]
+                    new_object = Road(x, y, infection_chance_modifier = inf_mod)
                     self._road_list.append(new_object)
                 elif char == "h":
-                    new_object = House(x, y, infection_chance_modifier=3)
+                    inf_mod = self._object_infection_modifiers["house"]
+                    new_object = House(x, y, infection_chance_modifier = inf_mod)
                     self._house_list.append(new_object)
                 elif char == "w":
-                    new_object = Work(x, y, infection_chance_modifier=2)
+                    inf_mod = self._object_infection_modifiers["work"]
+                    new_object = Work(x, y, infection_chance_modifier = inf_mod)
                     self._workplace_list.append(new_object)
                 elif char == "p":
-                    new_object = Park(x, y, infection_chance_modifier=1)
+                    inf_mod = self._object_infection_modifiers["park"]
+                    new_object = Park(x, y, infection_chance_modifier = inf_mod)
                     self._park_list.append(new_object)
                 elif char == "c":
-                    new_object = CommonArea(x, y, infection_chance_modifier=2)
+                    inf_mod = self._object_infection_modifiers["common"]
+                    new_object = CommonArea(x, y, infection_chance_modifier = inf_mod)
                     self._commonarea_list.append(new_object)
                 else:
                     raise ValueError(f"Unknown map object")
@@ -156,8 +171,6 @@ class World:
             actor = self._actors_list[i]
             actor.set_infected(infection_length = self._infection_length_frames)
             self._actor_params[i] = actor.params
-
-        self._infected_history = [initial_infect_inds]
 
         print(" "*len(s), end = "\r")
         print("100%")
@@ -223,13 +236,6 @@ class World:
                     if actor.current_container != actor.homeplace:
                         actor.set_motion(self._map, actor.homeplace)
 
-        num_infected = 0
-        for actor_params in self._actor_params:
-            if actor_params["infection_status"] == 1:
-                num_infected += 1
-
-            self._infected_history.append(num_infected)
-
         self._global_time += 1
 
 
@@ -261,7 +267,6 @@ class World:
                                     item.infection_occurences += 1
 
 
-
     def send_N_to_work(self, N):
         inds = np.random.randint(self._num_actors, size = N)
         for ind in inds:
@@ -281,12 +286,21 @@ class World:
         return self._actor_params.copy()
 
 
-    def get_num_infected_history(self):
-        return self._infected_history
-
-
     def get_actors(self):
         return self._actors_list
+
+    
+    def get_map(self):
+        return self._map
+
+    
+    def get_actor_states_num(self):
+        states = np.zeros(3)
+        for actor in self._actors_list:
+            state = actor.params["infection_status"]
+            states[int(state)] += 1
+
+        return states
 
 
     def plot_world(self, ax = None):
@@ -534,6 +548,8 @@ class Actor:
         self._current_container = homeplace
         self._name = None
         self._map = map_
+        self._stored_paths = []
+
         self._common_timer_max = 100
         self._common_timer = 0
 
@@ -543,12 +559,17 @@ class Actor:
         self._plotpos_modifier = (np.random.random(size=2)-0.5)/3
         homeplace.add_actor(self)
 
+
         self._init_params()
 
     
     def set_workplace(self, map_, workplace):
         self._xwork, self._ywork = workplace.position
         self._workplace = workplace
+
+        if self._workpath is not None:
+            if self._workpath in self._stored_paths:
+                self._stored_paths.remove(self._workpath)
 
         workpath = self.find_path(map_, workplace, self.homeplace)
         if workpath != False:

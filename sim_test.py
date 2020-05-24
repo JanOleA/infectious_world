@@ -1,30 +1,44 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.patches as patches
-from matplotlib import animation
+from matplotlib import animation, cm
 from PIL import Image
 import random
 import time
 import names
 from world import World
+import seaborn as sns
 
 fps = 30
-max_frames = 1200
+max_frames = 10000
+num_inhabitants = 400
 save_anim = False
 
 im = Image.open("map.png")
 
+object_infection_modifiers = {}
+object_infection_modifiers["park"] = 1
+object_infection_modifiers["road"] = 6
+object_infection_modifiers["house"] = 2
+object_infection_modifiers["work"] = 1.5
+object_infection_modifiers["common"] = 2
+
 world = World(np.array(im),
-              num_inhabitants = 400,
+              num_inhabitants = num_inhabitants,
               worker_ratio = 0.5,
               day_length = 500,
               work_length_factor = 0.3,
               workend_common_chance = 0.05,
               home_common_chance = 0.005,
-              infection_chance = 1,
-              infection_length = 1)
+              infection_chance = 0.3,
+              infection_length = 3,
+              object_infection_modifiers = object_infection_modifiers)
 
-position_history = [world.get_actor_plotpositions()]
+position_history = np.zeros((max_frames + 1, num_inhabitants, 2))
+position_history[0] = world.get_actor_plotpositions()
+
+state_history = np.zeros((max_frames + 1, 3))
+state_history[0] = world.get_actor_states_num()
+
 params_history = [world.get_actor_params()]
 
 print("Running sim...")
@@ -32,14 +46,42 @@ for i in range(max_frames):
     if i % 10 == 0:
         print(f"{i/max_frames*100:3.1f}%", end = "\r")
     world.frame_forward()
-    position_history.append(world.get_actor_plotpositions())
+    position_history[i + 1] = world.get_actor_plotpositions()
+    state_history[i + 1] = world.get_actor_states_num()
     params_history.append(world.get_actor_params())
 
-num_infected_history = world.get_num_infected_history()
+print(f"100%   ")
 
-print("")
+map_ = world.get_map()
 
-fig, ax = plt.subplots(figsize=(8,8))
+infection_rates = np.zeros(map_.shape)
+
+for i, row in enumerate(map_):
+    for j, item in enumerate(row):
+        infection_rates[i, j] = item.infection_occurences
+
+plt.figure(figsize = (8,8))
+hmap = sns.heatmap(infection_rates[::-1],
+                   cmap = cm.OrRd,
+                   alpha = 0.8,
+                   zorder = 2)
+plt.axis("equal")
+
+hmap.imshow(np.array(im)[::-1],
+            aspect = hmap.get_aspect(),
+            extent = hmap.get_xlim() + hmap.get_ylim(),
+            zorder = 1)
+
+
+fig, ax = plt.subplots(figsize = (8,8))
+plt.plot(state_history[:,0], label = "susceptible", color = "blue")
+plt.plot(state_history[:,1], label = "infected", color = "red")
+plt.plot(state_history[:,2], label = "recovered", color = "green")
+plt.legend()
+plt.xlabel("Frame")
+plt.ylabel("Inhabitants")
+
+fig, ax = plt.subplots(figsize = (8,8))
 
 print("Plotting map...")
 world.plot_world(ax = ax)
@@ -59,15 +101,16 @@ day_length = world.day_length
 
 print("Animating...")
 def animate(i):
-    positions = position_history[i]
-    params = params_history[i]
+    index = i + 1
+    positions = position_history[index]
+    params = params_history[index]
     colors = []
     for actor in params:
         colors.append(actor["color"])
     d.set_offsets(positions)
     d.set_color(colors)
-    day = i//day_length
-    plt.title(f"Frame {i}, day {day}, day progress {(i%day_length)/day_length:1.2f}, infected = {num_infected_history[i]}")
+    day = index//day_length
+    plt.title(f"Frame {index}, day {day}, day progress {(index)/day_length:1.2f}, infected = {state_history[index][1]}")
     return d,
 
 Writer = animation.writers['ffmpeg']
