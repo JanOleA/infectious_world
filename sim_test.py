@@ -7,53 +7,68 @@ import time
 import names
 from world import World
 import seaborn as sns
+import time
 
 fps = 30
-max_frames = 10000
-num_inhabitants = 400
+max_frames = 35000
+num_inhabitants = 1000
+day_length = 700
+worker_ratio = 0.5
+day_length = day_length
+work_length_factor = 0.3
+workend_common_chance = 0.05
+home_common_chance = 0.005
+infection_chance = 0.1
+infection_length = 7
 save_anim = False
 
-im = Image.open("map.png")
+im = Image.open("mixedmap_half.png")
 
 object_infection_modifiers = {}
 object_infection_modifiers["park"] = 1
 object_infection_modifiers["road"] = 6
-object_infection_modifiers["house"] = 2
-object_infection_modifiers["work"] = 1.5
-object_infection_modifiers["common"] = 2
+object_infection_modifiers["house"] = 3
+object_infection_modifiers["work"] = 1.2
+object_infection_modifiers["common"] = 1.5
 
 world = World(np.array(im),
               num_inhabitants = num_inhabitants,
               worker_ratio = 0.5,
-              day_length = 500,
-              work_length_factor = 0.3,
-              workend_common_chance = 0.05,
-              home_common_chance = 0.005,
-              infection_chance = 0.3,
-              infection_length = 3,
+              day_length = day_length,
+              work_length_factor = work_length_factor,
+              workend_common_chance = workend_common_chance,
+              home_common_chance = home_common_chance,
+              infection_chance = infection_chance,
+              infection_length = infection_length,
               object_infection_modifiers = object_infection_modifiers)
+
+day_array = np.arange(max_frames + 1)/day_length
 
 position_history = np.zeros((max_frames + 1, num_inhabitants, 2))
 position_history[0] = world.get_actor_plotpositions()
 
 state_history = np.zeros((max_frames + 1, 3))
-state_history[0] = world.get_actor_states_num()
+color_history = np.empty((max_frames + 1, num_inhabitants), dtype=str)
+
+state_history[0], color_history[0] = world.get_states_and_colors()
+
+frame_time = np.zeros(max_frames)
 
 params_history = [world.get_actor_params()]
 
 print("Running sim...")
 for i in range(max_frames):
+    time_init = time.time()
     if i % 10 == 0:
         print(f"{i/max_frames*100:3.1f}%", end = "\r")
     world.frame_forward()
     position_history[i + 1] = world.get_actor_plotpositions()
-    state_history[i + 1] = world.get_actor_states_num()
-    params_history.append(world.get_actor_params())
+    state_history[i + 1], color_history[i + 1] = world.get_states_and_colors()
+    frame_time[i] = time.time() - time_init
 
 print(f"100%   ")
 
 map_ = world.get_map()
-
 infection_rates = np.zeros(map_.shape)
 
 for i, row in enumerate(map_):
@@ -67,19 +82,35 @@ hmap = sns.heatmap(infection_rates[::-1],
                    zorder = 2)
 plt.axis("equal")
 
-hmap.imshow(np.array(im)[::-1],
+hmap.imshow(np.array(im),
             aspect = hmap.get_aspect(),
             extent = hmap.get_xlim() + hmap.get_ylim(),
             zorder = 1)
 
+plt.savefig("plots/infection_heatmap.pdf", dpi = 400)
 
 fig, ax = plt.subplots(figsize = (8,8))
-plt.plot(state_history[:,0], label = "susceptible", color = "blue")
-plt.plot(state_history[:,1], label = "infected", color = "red")
-plt.plot(state_history[:,2], label = "recovered", color = "green")
+plt.plot(day_array, state_history[:,0], label = "susceptible", color = "blue")
+plt.plot(day_array, state_history[:,1], label = "infected", color = "red")
+plt.plot(day_array, state_history[:,2], label = "recovered", color = "green")
 plt.legend()
-plt.xlabel("Frame")
+plt.xlabel("Day")
 plt.ylabel("Inhabitants")
+plt.savefig("plots/infection_development.pdf", dpi = 400)
+
+plt.figure(figsize = (8,8))
+day_comptimes = []
+start = 0
+end = day_length
+while start < max_frames:
+    day_comptimes.append(np.sum(frame_time[start:end]))
+    start += day_length
+    end += day_length
+
+plt.plot(day_comptimes)
+plt.xlabel("Day")
+plt.ylabel("Computation time")
+plt.savefig("plots/comp_time.pdf", dpi = 400)
 
 fig, ax = plt.subplots(figsize = (8,8))
 
@@ -88,14 +119,9 @@ world.plot_world(ax = ax)
 
 initial_positions = position_history[0]
 
-initial_params = params_history[0]
-colors = []
-for actor in initial_params:
-    colors.append(actor["color"])
-
 d = ax.scatter(initial_positions[:,0],
                initial_positions[:,1],
-               c = colors, s = 5, zorder = 4)
+               c = color_history[0], s = 5, zorder = 4)
 
 day_length = world.day_length
 
@@ -103,12 +129,8 @@ print("Animating...")
 def animate(i):
     index = i + 1
     positions = position_history[index]
-    params = params_history[index]
-    colors = []
-    for actor in params:
-        colors.append(actor["color"])
     d.set_offsets(positions)
-    d.set_color(colors)
+    d.set_color(color_history[index])
     day = index//day_length
     plt.title(f"Frame {index}, day {day}, day progress {(index)/day_length:1.2f}, infected = {state_history[index][1]}")
     return d,

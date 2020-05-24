@@ -302,6 +302,17 @@ class World:
 
         return states
 
+    
+    def get_states_and_colors(self):
+        states = np.zeros(3)
+        colors = []
+        for actor in self._actors_list:
+            state = actor.params["infection_status"]
+            states[int(state)] += 1
+            colors.append(actor.params["color"])
+
+        return states, colors
+
 
     def plot_world(self, ax = None):
         """ Plot the world in its current state """
@@ -549,6 +560,7 @@ class Actor:
         self._name = None
         self._map = map_
         self._stored_paths = []
+        self._stored_paths_usage = []
 
         self._common_timer_max = 100
         self._common_timer = 0
@@ -569,11 +581,15 @@ class Actor:
 
         if self._workpath is not None:
             if self._workpath in self._stored_paths:
+                index = self._stored_paths.index(self._workpath)
                 self._stored_paths.remove(self._workpath)
+                self._stored_paths_usage.pop(index)
 
         workpath = self.find_path(map_, workplace, self.homeplace)
         if workpath != False:
             self._workpath = workpath
+            self._stored_paths.append(self._workpath)
+            self._stored_paths_usage.append(2000) # workpath has large weight to remain
         else:
             print("Could not find workpath for", self, f"living at {self.position}")
 
@@ -583,21 +599,39 @@ class Actor:
         self._plotpos_modifier = np.zeros(2)
         self._x, self._y = self.current_container.position
         current_path = None
-        if target == self._workplace:
-            if self._current_container in self._workpath:
-                current_path = self._workpath
-                path_ind = current_path.index(self._current_container)
-        elif target == self._homeplace:
-            if self._current_container in self._workpath:
-                current_path = self._workpath[::-1]
-                path_ind = current_path.index(self._current_container)
+
+        # look for path in stored paths
+        for check_path in self._stored_paths:
+            if target == check_path[-1]:
+                if self._current_container in check_path:
+                    current_path = check_path
+                    path_ind = current_path.index(self._current_container)
+            elif target == check_path[0]:
+                 if self._current_container in check_path:
+                    current_path = check_path[::-1]
+                    path_ind = current_path.index(self._current_container)
         
+        # if a valid path could not be find, generate a new one
         if current_path is None:
             current_path = self.find_path(map_, target, start = self._current_container)
+
+            # store new path in stored paths, but first remove the least
+            # used one if there are 20 or more paths stored
+            if len(self._stored_paths) >= 20:
+                ind_remove = np.argmin(self._stored_paths_usage)
+                self._stored_paths.pop(ind_remove)
+                self._stored_paths_usage.pop(ind_remove)
+            if not current_path in self._stored_paths:
+                self._stored_paths.append(current_path)
+                self._stored_paths_usage.append(0)
             path_ind = 0
 
+        if current_path in self._stored_paths:
+            index = self._stored_paths.index(current_path)
+            self._stored_paths_usage[index] += 1
+
         if self._current_container == target:
-            """ already at target """
+            # already at the target
             if not self in self._current_container.contained_actors:
                 self._current_container.add_actor(self)
             self._x, self._y = target.position
@@ -607,7 +641,7 @@ class Actor:
             self._current_path = None
             return
 
-        try:    
+        try:
             self._target_node = current_path[path_ind + 1]
         except Exception as e:
             print("Couldn't update target node:", e)
@@ -867,8 +901,6 @@ class Person(Actor):
 
     def _init_params(self):
         self._params["color"] = "cyan"
-        self._params["shape"] = "^"
-        self._params["markersize"] = 1
         # infection status values:
         # 0 = susceptible
         # 1 = infected
@@ -894,7 +926,7 @@ class Person(Actor):
         self._params["infection_status"] = 1
         self._params["color"] = "red"
         self._infection_duration = 0
-        self._infection_length = infection_length + np.random.randint(11) - 5
+        self._infection_length = infection_length + np.random.randint(int(infection_length/20) + 1) - int(infection_length/40)
 
     
     def __str__(self):
