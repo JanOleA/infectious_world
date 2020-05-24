@@ -159,6 +159,7 @@ class World:
             new_person.set_workplace(self._map, workplace)
             if work_rolls[i] < self._worker_ratio:
                 new_person.set_param("active_worker", True)
+            new_person.set_preferred_commonarea(self._commonarea_list)
             house.add_dweller(new_person)
             self._actors_list.append(new_person)
             self._actor_positions.append(new_person.position)
@@ -187,6 +188,7 @@ class World:
 
         self.infect()
 
+        ### this loop defines the main behaviour of persons in this world
         for i, actor in enumerate(self._actors_list):
             actor_pos = actor.frame_forward()
             self._actor_positions[i] = actor_pos
@@ -197,44 +199,58 @@ class World:
 
             if actor.params["active_worker"]:
                 if actor.status == "idle":
+                    ### Leave home for work in the morning
                     if (day_time >= self._day_length*0.08
                             and day_time < self._day_length*0.15):
 
                         if roll < 0.1:
-                            actor.set_motion(self._map, actor.workplace)
+                            actor.set_motion(actor.workplace)
                     if (day_time == int(self._day_length*0.15)
                           and isinstance(actor.current_container, House)):
-                        actor.set_motion(self._map, actor.workplace)
+                        ### if the person still at home by day_length*0.15, go to work
+                        actor.set_motion(actor.workplace)
 
+                    ### leave work and go either home or to a commonarea
                     if (day_time >= self._day_length*0.08+self._work_length
                             and day_time < self._day_length*0.15+self._work_length):
-
                         if roll < 0.3:
-                            if roll < self._workend_common_chance:
-                                commonarea = np.random.choice(self._commonarea_list)
-                                actor.set_motion(self._map, commonarea)
+                            if roll < self._workend_common_chance*0.3:
+                                if np.random.random() < 0.9:
+                                    commonarea = actor.preffered_commonarea
+                                else:
+                                    commonarea = np.random.choice(self._commonarea_list)
+                                actor.set_motion(commonarea)
                             else:
-                                actor.set_motion(self._map, actor.homeplace)
+                                actor.set_motion(actor.homeplace)
 
+                    ### if still at work by day_length*0.16 + work_length, go home or to a commonarea
                     if (day_time == int(self._day_length*0.15+self._work_length)
                             and isinstance(actor.current_container, Work)):
                         if roll < self._workend_common_chance:
-                            actor.set_motion(self._map, actor.homeplace)
+                            if np.random.random() < 0.9:
+                                commonarea = actor.preffered_commonarea
+                            else:
+                                commonarea = np.random.choice(self._commonarea_list)
+                            actor.set_motion(commonarea)
                         else:
-                            actor.set_motion(self._map, actor.homeplace)
+                            actor.set_motion(actor.homeplace)
             else:
+                ### for homestayers, every frame has a chance of sending them to a commonarea
                 if actor.status == "idle" and actor.is_home:
                     if (roll < self._home_common_chance
                             and day_time > self._day_length*0.1
                             and day_time < self._day_length*0.5):
-                        commonarea = np.random.choice(self._commonarea_list)
-                        actor.set_motion(self._map, commonarea)
+                        if np.random.random() < 0.9:
+                            commonarea = actor.preffered_commonarea
+                        else:
+                            commonarea = np.random.choice(self._commonarea_list)
+                        actor.set_motion(commonarea)
 
-
+            ### at day_length*0.8 or more, send everyone home if they are not at home (and not currently moving somewhere else)
             if day_time >= self._day_length*0.8:
                 if actor.status == "idle":
                     if actor.current_container != actor.homeplace:
-                        actor.set_motion(self._map, actor.homeplace)
+                        actor.set_motion(actor.homeplace)
 
         self._global_time += 1
 
@@ -271,7 +287,7 @@ class World:
         inds = np.random.randint(self._num_actors, size = N)
         for ind in inds:
             actor = self._actors_list[ind]
-            actor.set_motion(self._map, actor.workplace)
+            actor.set_motion(actor.workplace)
 
     
     def get_actor_positions(self):
@@ -561,6 +577,7 @@ class Actor:
         self._map = map_
         self._stored_paths = []
         self._stored_paths_usage = []
+        self._preffered_commonarea = None
 
         self._common_timer_max = 100
         self._common_timer = 0
@@ -570,7 +587,6 @@ class Actor:
 
         self._plotpos_modifier = (np.random.random(size=2)-0.5)/3
         homeplace.add_actor(self)
-
 
         self._init_params()
 
@@ -594,7 +610,24 @@ class Actor:
             print("Could not find workpath for", self, f"living at {self.position}")
 
 
-    def set_motion(self, map_, target):
+    def set_preferred_commonarea(self, common_areas):
+        """ Find the closest common_area (in direct line) to current position
+        and set it as preffered
+        """
+        min_dist = np.linalg.norm(common_areas[0].position - self.position)
+        current_choice = common_areas[0]
+
+        for common_area in common_areas[1:]:
+            dist = np.linalg.norm(common_area.position - self.position)
+            if dist < min_dist:
+                min_dist = dist
+                current_choice = common_area
+
+        self._preffered_commonarea = current_choice
+
+
+    def set_motion(self, target):
+        map_ = self._map
         self._status = "moving"
         self._plotpos_modifier = np.zeros(2)
         self._x, self._y = self.current_container.position
@@ -672,7 +705,7 @@ class Actor:
             self._common_timer += 1
             if self._common_timer > self._common_timer_max:
                 self._common_timer = 0
-                self.set_motion(self._map, self.homeplace)
+                self.set_motion(self.homeplace)
         else:
             self._common_timer = 0
 
@@ -846,6 +879,10 @@ class Actor:
             plt.plot([cur_pos[0], next_pos[0]], [cur_pos[1], next_pos[1]], color = "black")
             cur_pos = next_pos
 
+
+    @property
+    def preffered_commonarea(self):
+        return self._preffered_commonarea
 
     @property
     def is_home(self):

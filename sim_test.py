@@ -11,18 +11,20 @@ import time
 
 fps = 30
 max_frames = 35000
-num_inhabitants = 1000
+num_inhabitants = 2000
 day_length = 700
 worker_ratio = 0.5
-day_length = day_length
 work_length_factor = 0.3
-workend_common_chance = 0.05
+workend_common_chance = 0.03
 home_common_chance = 0.005
-infection_chance = 0.1
+infection_chance = 0.15
 infection_length = 7
 save_anim = True
+anim_skipframes = 5
 
-im = Image.open("mixedmap_half.png")
+sim_name = "fullmixed"
+
+im = Image.open("mixedmap.png")
 
 object_infection_modifiers = {}
 object_infection_modifiers["park"] = 1
@@ -56,17 +58,28 @@ frame_time = np.zeros(max_frames)
 
 params_history = [world.get_actor_params()]
 
+eta = 0
+s = ""
+
 print("Running sim...")
 for i in range(max_frames):
     time_init = time.time()
     if i % 10 == 0:
-        print(f"{i/max_frames*100:3.1f}%", end = "\r")
+        print(" "*len(s), end = "\r")
+        minutes = int(eta)
+        seconds = eta%1*60
+        s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d}"
+        print(s, end = "\r")
     world.frame_forward()
     position_history[i + 1] = world.get_actor_plotpositions()
     state_history[i + 1], color_history[i + 1] = world.get_states_and_colors()
     frame_time[i] = time.time() - time_init
+    if i > 0:
+        avg_time = np.mean(frame_time[:i])
+        eta = (avg_time*(max_frames - i)//6)/10
 
-print(f"100%   ")
+print(" "*len(s), end = "\r")
+print("Simulation completed...")
 
 map_ = world.get_map()
 infection_rates = np.zeros(map_.shape)
@@ -87,7 +100,7 @@ hmap.imshow(np.array(im),
             extent = hmap.get_xlim() + hmap.get_ylim(),
             zorder = 1)
 
-plt.savefig("plots/infection_heatmap.pdf", dpi = 400)
+plt.savefig(f"plots/infection_heatmap_{sim_name}.pdf", dpi = 400)
 
 fig, ax = plt.subplots(figsize = (8,8))
 plt.plot(day_array, state_history[:,0], label = "susceptible", color = "blue")
@@ -96,7 +109,7 @@ plt.plot(day_array, state_history[:,2], label = "recovered", color = "green")
 plt.legend()
 plt.xlabel("Day")
 plt.ylabel("Inhabitants")
-plt.savefig("plots/infection_development.pdf", dpi = 400)
+plt.savefig(f"plots/infection_development_{sim_name}.pdf", dpi = 400)
 
 plt.figure(figsize = (8,8))
 day_comptimes = []
@@ -110,9 +123,10 @@ while start < max_frames:
 plt.plot(day_comptimes)
 plt.xlabel("Day")
 plt.ylabel("Computation time")
-plt.savefig("plots/comp_time.pdf", dpi = 400)
+plt.savefig(f"plots/comp_time_{sim_name}.pdf", dpi = 400)
 
-fig, ax = plt.subplots(figsize = (8,8))
+anim_size = np.array(map_.T.shape)/len(map_[1])*13
+fig, ax = plt.subplots(figsize = anim_size.astype(int))
 
 print("Plotting map...")
 world.plot_world(ax = ax)
@@ -127,19 +141,19 @@ day_length = world.day_length
 
 print("Animating...")
 def animate(i):
-    index = i + 1
+    index = i*anim_skipframes + 1
     positions = position_history[index]
     d.set_offsets(positions)
     d.set_color(color_history[index])
     day = index//day_length
-    plt.title(f"Frame {index}, day {day}, day progress {(index)/day_length:1.2f}, infected = {state_history[index][1]}")
+    plt.title(f"Frame {index}, day {day}, day progress {((index)/day_length)%1:1.2f}, infected = {state_history[index][1]}")
     return d,
 
 Writer = animation.writers['ffmpeg']
 writer = Writer(fps=fps, metadata=dict(artist='Me'), bitrate=3000)
 
-anim = animation.FuncAnimation(fig, animate, frames=max_frames, interval=20)
+anim = animation.FuncAnimation(fig, animate, frames=max_frames//anim_skipframes, interval=20)
 if save_anim:
     print("Saving animation...")
-    anim.save("test.mp4", writer=writer)
+    anim.save(f"movies/movie_{sim_name}.mp4", writer=writer)
 plt.show()
