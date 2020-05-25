@@ -2,9 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import animation, cm
 from PIL import Image
-import random
 import time
-import names
 from world import World
 import seaborn as sns
 import time
@@ -35,7 +33,7 @@ object_infection_modifiers["common"] = 1.5
 
 world = World(np.array(im),
               num_inhabitants = num_inhabitants,
-              worker_ratio = 0.5,
+              worker_ratio = worker_ratio,
               day_length = day_length,
               work_length_factor = work_length_factor,
               workend_common_chance = workend_common_chance,
@@ -128,7 +126,6 @@ plt.savefig(f"plots/comp_time_{sim_name}.pdf", dpi = 400)
 anim_size = np.array(map_.T.shape)/len(map_[1])*13
 fig, ax = plt.subplots(figsize = anim_size.astype(int))
 
-print("Plotting map...")
 world.plot_world(ax = ax)
 
 initial_positions = position_history[0]
