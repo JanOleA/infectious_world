@@ -21,6 +21,10 @@ class World:
                  infection_length = 2,
                  object_infection_modifiers = None):
 
+        """ Initialize the world and all parameters, generate the map and
+        initialize the inhabitants
+        """
+
         in_map = in_map[::-1]
         self._image_map = in_map
 
@@ -58,6 +62,7 @@ class World:
 
     
     def generate_map(self, in_map):
+        """ Load the map and create all the map objects """
         print("Generating map...")
         self._map = []
         self._world_size = [len(in_map), len(in_map[0])]
@@ -134,6 +139,9 @@ class World:
 
 
     def initialize_inhabitans(self):
+        """ Generate all the inhabitants, and set them to workers with the 
+        chance as defined in world initialization
+        """
         print("Initializing actors...")
 
         self._actor_positions = []
@@ -197,36 +205,34 @@ class World:
 
             roll = rolls[i]
 
-            if actor.params["active_worker"]:
-                if actor.status == "idle":
-                    ### Leave home for work in the morning
-                    if (day_time >= self._day_length*0.08
-                            and day_time < self._day_length*0.15):
+            behavior = actor.params["behavior"]
 
-                        if roll < 0.1:
-                            actor.set_motion(actor.workplace)
-                    if (day_time == int(self._day_length*0.15)
-                          and isinstance(actor.current_container, House)):
-                        ### if the person still at home by day_length*0.15, go to work
+            if behavior == "normal":
+                self._normal_actor_behaviour(actor, roll, day_time)
+            elif behavior == "stay_home":
+                self._stay_home_behaviour(actor, roll, day_time)
+
+        self._global_time += 1
+
+
+    def _normal_actor_behaviour(self, actor, roll, day_time):
+        if actor.params["active_worker"]:
+            if actor.status == "idle":
+                ### Leave home for work in the morning
+                if (day_time >= self._day_length*0.08
+                        and day_time < self._day_length*0.15):
+                    if roll < 0.1:
                         actor.set_motion(actor.workplace)
+                if (day_time == int(self._day_length*0.15)
+                      and isinstance(actor.current_container, House)):
+                    ### if the person still at home by day_length*0.15, go to work
+                    actor.set_motion(actor.workplace)
 
-                    ### leave work and go either home or to a commonarea
-                    if (day_time >= self._day_length*0.08+self._work_length
-                            and day_time < self._day_length*0.15+self._work_length):
-                        if roll < 0.3:
-                            if roll < self._workend_common_chance*0.3:
-                                if np.random.random() < 0.9:
-                                    commonarea = actor.preffered_commonarea
-                                else:
-                                    commonarea = np.random.choice(self._commonarea_list)
-                                actor.set_motion(commonarea)
-                            else:
-                                actor.set_motion(actor.homeplace)
-
-                    ### if still at work by day_length*0.16 + work_length, go home or to a commonarea
-                    if (day_time == int(self._day_length*0.15+self._work_length)
-                            and isinstance(actor.current_container, Work)):
-                        if roll < self._workend_common_chance:
+                ### leave work and go either home or to a commonarea
+                if (day_time >= self._day_length*0.08+self._work_length
+                        and day_time < self._day_length*0.15+self._work_length):
+                    if roll < 0.3:
+                        if roll < self._workend_common_chance*0.3:
                             if np.random.random() < 0.9:
                                 commonarea = actor.preffered_commonarea
                             else:
@@ -234,25 +240,63 @@ class World:
                             actor.set_motion(commonarea)
                         else:
                             actor.set_motion(actor.homeplace)
-            else:
-                ### for homestayers, every frame has a chance of sending them to a commonarea
-                if actor.status == "idle" and actor.is_home:
-                    if (roll < self._home_common_chance
-                            and day_time > self._day_length*0.1
-                            and day_time < self._day_length*0.5):
+
+                ### if still at work by day_length*0.16 + work_length, go home or to a commonarea
+                if (day_time == int(self._day_length*0.15+self._work_length)
+                        and isinstance(actor.current_container, Work)):
+                    if roll < self._workend_common_chance:
                         if np.random.random() < 0.9:
                             commonarea = actor.preffered_commonarea
                         else:
                             commonarea = np.random.choice(self._commonarea_list)
                         actor.set_motion(commonarea)
-
-            ### at day_length*0.8 or more, send everyone home if they are not at home (and not currently moving somewhere else)
-            if day_time >= self._day_length*0.8:
-                if actor.status == "idle":
-                    if actor.current_container != actor.homeplace:
+                    else:
                         actor.set_motion(actor.homeplace)
+        else:
+            ### for homestayers, every frame has a chance of sending them to a commonarea
+            if actor.status == "idle" and actor.is_home:
+                if (roll < self._home_common_chance
+                        and day_time > self._day_length*0.1
+                        and day_time < self._day_length*0.5):
+                    if np.random.random() < 0.9:
+                        commonarea = actor.preffered_commonarea
+                    else:
+                        commonarea = np.random.choice(self._commonarea_list)
+                    actor.set_motion(commonarea)
 
-        self._global_time += 1
+        ### at day_length*0.8 or more, send the actor home if it is not at home (and not moving somewhere right now)
+        if day_time >= self._day_length*0.8:
+            if actor.status == "idle":
+                if actor.current_container != actor.homeplace:
+                    actor.set_motion(actor.homeplace)
+
+
+    def _stay_home_behaviour(self, actor, roll, day_time):
+        if not actor.is_home:
+            if not actor.current_path_goal == actor.homeplace:
+                actor.set_motion(actor.homeplace)
+
+
+    def set_behaviors(self, new_behavior, chance):
+        """ reset all actors to normal behavior, then set the new behavior with
+        the given chance
+        """
+        rolls = np.random.random(size=self._num_actors)
+        for roll, actor in zip(rolls, self._actors_list):
+            if roll < chance:
+                actor.set_param("behavior", new_behavior)
+            else:
+                actor.set_param("behavior", "normal")
+
+    
+    def set_behaviors_conditional(self, new_behavior, old_behavior, chance = 1):
+        """ set the behavior to the new behavior with the given chance, provided
+        the old behavior is correct
+        """
+        rolls = np.random.random(size=self._num_actors)
+        for roll, actor in zip(rolls, self._actors_list):
+            if roll < chance and actor.params["behavior"] == old_behavior:
+                actor.set_param("behavior", new_behavior)
 
 
     def infect(self):
@@ -814,6 +858,7 @@ class Actor:
     def _init_params(self):
         self._params["color"] = "black"
         self._params["basic_speed"] = 0.2
+        self._params["behavior"] = "normal"
 
 
     def set_param(self, param, value):
@@ -893,7 +938,9 @@ class Actor:
 
     @property
     def current_path_goal(self):
-        return self._current_path[-1]
+        if self._current_path is not None:
+            return self._current_path[-1]
+        return None
 
     @property
     def position(self):
@@ -948,11 +995,14 @@ class Person(Actor):
         self._params["active_worker"] = False
         self._params["basic_speed"] = 0.45
 
+        self._params["behavior"] = "normal"
+
 
     def frame_forward(self):
         if self._params["infection_status"] == 1:
             self._infection_duration += 1
             if self._infection_duration > self._infection_length:
+                """ become immune """
                 self._params["infection_status"] = 2
                 self._params["color"] = "green"
                 self._infection_duration = 0

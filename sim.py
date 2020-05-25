@@ -24,8 +24,11 @@ class InfectSim:
         self.workend_common_chance = params["workend_common_chance"]
         self.home_common_chance = params["home_common_chance"]
         self.infection_chance = params["infection_chance"]
+        self.initial_infected = params["initial_infected"]
         self.infection_length = params["infection_length"]
         self.object_infection_modifiers = params["object_infection_modifiers"]
+        self.lockdown_ratio = params["lockdown_ratio"]
+        self.lockdown_chance = params["lockdown_chance"]
 
         self.im = Image.open(mapfile)
         self.map_array = np.array(self.im)
@@ -67,6 +70,9 @@ class InfectSim:
         eta = 0
         s = ""
 
+        current_infected = self.initial_infected
+        lockdown_initiated = False
+
         time_begin = time.time()
         print("Running sim...")
         for i in range(max_frames):
@@ -75,11 +81,18 @@ class InfectSim:
                 print(" "*len(s), end = "\r")
                 minutes = int(eta)
                 seconds = eta%1*60
-                s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d}"
+                s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d} | Current infected = {current_infected}"
                 print(s, end = "\r")
             self.world.frame_forward()
             self.position_history[i + 1] = self.world.get_actor_plotpositions()
             self.state_history[i + 1], self.color_history[i + 1] = self.world.get_states_and_colors()
+
+            current_infected = self.state_history[i + 1][1]
+            if (current_infected / self.num_inhabitants > self.lockdown_ratio
+                    and not lockdown_initiated):
+                self.world.set_behaviors("stay_home", self.lockdown_chance)
+                lockdown_initiated = True
+
             time_now = time.time()
             self.frame_time[i] = time_now - frame_time_init
             total_elapsed_time = time_now - time_begin 
