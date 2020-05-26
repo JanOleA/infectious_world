@@ -8,6 +8,7 @@ import seaborn as sns
 import time
 import os
 
+
 class InfectSim:
     def __init__(self, mapfile, params, sim_name):
         """ Initialize the simulation.
@@ -61,33 +62,38 @@ class InfectSim:
 
         self.state_history[0], self.color_history[0] = self.world.get_states_and_colors()
 
+        self.R_history = np.full(max_frames + 1, np.nan)
+        self.mult_history = np.full(max_frames + 1, np.nan)
+
         self.frame_time = np.zeros(max_frames)
         self._has_simulated = False
         self.infection_heatmap = None
+        self.recovered_stats = None
     
 
     def run_sim(self, max_frames = None):
         if max_frames is None:
             max_frames = self.max_frames
         eta = 0
+        R0 = np.nan
         s = ""
+
+        R_eval_time = int(self.infection_length*self.day_length*1.1)
+        R0_max_time = int(self.infection_length*self.day_length*1.2)
 
         current_infected = self.initial_infected
         lockdown_initiated = False
 
         time_begin = time.time()
         print("Running sim...")
+
+        """ MAIN SIMULATION LOOP """
         for i in range(max_frames):
             frame_time_init = time.time()
-            if i % 10 == 0:
-                print(" "*len(s), end = "\r")
-                minutes = int(eta)
-                seconds = eta%1*60
-                s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d} | Current infected = {current_infected}"
-                print(s, end = "\r")
             self.world.frame_forward()
             self.position_history[i + 1] = self.world.get_actor_plotpositions()
             self.state_history[i + 1], self.color_history[i + 1] = self.world.get_states_and_colors()
+            self.recovered_stats = self.world.get_recovered_stats()
 
             current_infected = self.state_history[i + 1][1]
             if (current_infected / self.num_inhabitants > self.lockdown_ratio
@@ -95,15 +101,34 @@ class InfectSim:
                 self.world.set_behaviors("stay_home", self.lockdown_chance)
                 lockdown_initiated = True
 
+            if self.world.global_time > R_eval_time:
+                recovered_recently = self.recovered_stats[:,0][(self.world.global_time - self.recovered_stats[:,1]) < R_eval_time]
+                if len(recovered_recently) > 0:
+                    self.R_history[i + 1] = np.average(recovered_recently)
+                    if self.world.global_time < R0_max_time:
+                        R0 = np.average(self.R_history[R_eval_time + 1: R0_max_time])
+                    if self.state_history[int(i - self.infection_length*self.day_length)][1] != 0:
+                        self.mult_history[i + 1] = current_infected/self.state_history[int(i - self.infection_length*self.day_length)][1]
+
+            if i % 10 == 0:
+                print(" "*len(s), end = "\r")
+                minutes = int(eta)
+                seconds = eta%1*60
+                s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d} | Current infected = {current_infected} | R0 = {R0:3.3f}"
+                print(s, end = "\r")
+
             time_now = time.time()
             self.frame_time[i] = time_now - frame_time_init
             total_elapsed_time = time_now - time_begin 
             eta = (((total_elapsed_time)/(i + 1))*(max_frames - i)//6)/10
 
+
+        """ CLEANING UP AND SAVING DATA """
+
         print(" "*len(s), end = "\r")
         minutes = total_elapsed_time/60
         seconds = minutes%1*60
-        print(f"Simulation completed... Time taken: {int(minutes)}:{int(seconds)}")
+        print(f"Simulation completed... Time taken: {int(minutes):02d}:{int(seconds):02d}")
         self.map = self.world.get_map()
 
         if not os.path.exists(f"{os.getcwd()}/output"):
@@ -117,6 +142,7 @@ class InfectSim:
                        self.im,
                        self.position_history,
                        self.state_history,
+                       self.color_history,
                        self.day_length]
 
         print("Saving data...")
@@ -153,12 +179,30 @@ class InfectSim:
         fig, ax = plt.subplots(figsize = (8,8))
         state_history = self.state_history
         day_array = self.day_array
-        ax.plot(day_array, state_history[:,0], label = "susceptible", color = "blue")
-        ax.plot(day_array, state_history[:,1], label = "infected", color = "red")
-        ax.plot(day_array, state_history[:,2], label = "recovered", color = "green")
-        plt.legend()
+        l1 = ax.plot(day_array, state_history[:,0], label = "susceptible", color = "blue")
+        l2 = ax.plot(day_array, state_history[:,1], label = "infected", color = "red")
+        l3 = ax.plot(day_array, state_history[:,2], label = "recovered", color = "green")
+        ax.set_ylabel("Inhabitants")
+
+        ax2 = ax.twinx()
+
+        # shift R history
+        R_history = self.R_history[int(self.day_length*self.infection_length):]
+        R_plot = np.zeros(len(day_array))
+        R_plot[:len(R_history)] = R_history
+
+        l4 = ax2.plot(day_array, R_plot, "--", color = "orange", label="R value")
+        l5 = ax2.plot(day_array, self.mult_history, "--", color = "grey", label="growth factor", linewidth = 0.5)
+        ax2.set_ylabel("R value / growth factor", color = "orange")
+        ax2.tick_params(axis='y', colors = "orange")
+        ax2.set_ylim(0, 5)
+
         plt.xlabel("Day")
-        plt.ylabel("Inhabitants")
+        
+        lns = l1 + l2 + l3 + l4 + l5
+        labs = [l.get_label() for l in lns]
+        ax.legend(lns, labs, loc = 1)
+
         if save_plot: plt.savefig(f"{self.output_dir}/infection_development.pdf", dpi = 400)
 
 

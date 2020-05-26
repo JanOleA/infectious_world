@@ -1,10 +1,11 @@
 from sim import InfectSim
 import matplotlib.pyplot as plt
+import json
 
 sim_name = "fullmixed"
 mapfile = "mixedmap.png"
 
-params = {}
+params = {"mapfile": mapfile}
 
 # number of days to simulate
 params["sim_days"] = 50
@@ -13,7 +14,7 @@ params["sim_days"] = 50
 params["num_inhabitants"] = 2000
 
 # number of infected inhabitants at the beginning of the simulation
-params["initial_infected"] = 1
+params["initial_infected"] = 5
 
 # length of each day in frames
 params["day_length"] = 700
@@ -32,9 +33,9 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.15
+params["infection_chance"] = 0.13
 
-# how many days the infection lasts
+# how many days the infection lasts on average
 params["infection_length"] = 5
 
 # ratio of inhabitants that must be infected for lockdown to be put into effect
@@ -54,6 +55,9 @@ object_infection_modifiers["house"] = 3
 object_infection_modifiers["work"] = 1.2
 object_infection_modifiers["common"] = 1.5
 params["object_infection_modifiers"] = object_infection_modifiers
+
+with open(f"sim_params/{sim_name}.json", "w") as outfile:
+    json.dump(params, outfile, indent = 4)
 
 simulation = InfectSim(mapfile, params, sim_name)
 simulation.run_sim()

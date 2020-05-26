@@ -1,0 +1,22 @@
+{
+    "mapfile": "mixedmap.png",
+    "sim_days": 50,
+    "num_inhabitants": 2000,
+    "initial_infected": 5,
+    "day_length": 700,
+    "worker_ratio": 0.6,
+    "work_length_factor": 0.3,
+    "workend_common_chance": 0.03,
+    "home_common_chance": 0.005,
+    "infection_chance": 0.13,
+    "infection_length": 5,
+    "lockdown_ratio": 1,
+    "lockdown_chance": 0,
+    "object_infection_modifiers": {
+        "park": 1,
+        "road": 4,
+        "house": 3,
+        "work": 1.2,
+        "common": 1.5
+    }
+}

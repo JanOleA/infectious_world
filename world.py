@@ -187,6 +187,7 @@ class World:
         self._actor_positions = np.array(self._actor_positions, dtype=np.float64)
         self._actor_plotpositions = np.array(self._actor_plotpositions, dtype=np.float64)
         self._actor_params = np.array(self._actor_params)
+        self._recovered_stats = np.zeros((self._num_actors, 2))
 
 
     def frame_forward(self):
@@ -198,10 +199,14 @@ class World:
 
         ### this loop defines the main behaviour of persons in this world
         for i, actor in enumerate(self._actors_list):
-            actor_pos = actor.frame_forward()
+            actor_pos = actor.frame_forward(self._global_time)
             self._actor_positions[i] = actor_pos
             self._actor_plotpositions[i] = actor.plotpos
-            self._actor_params[i] = actor.params
+            actor_params = actor.params
+            self._actor_params[i] = actor_params
+
+            if actor_params["infection_status"] == 2:
+                self._recovered_stats[i] = (actor_params["infected_others"], actor_params["became_immune"])
 
             roll = rolls[i]
 
@@ -300,7 +305,10 @@ class World:
 
 
     def infect(self):
-        """ method for spreading the disease """
+        """ Checks all the objects in the map and spreads disease according
+        to the world parameters to other actors in boxes with infected actors
+        in them.
+        """
         for row in self._map:
             for item in row:
                 location_modifier = item.infection_chance_modifier
@@ -317,12 +325,14 @@ class World:
                         if one_params["infection_status"] == 1:
                             if other_params["infection_status"] == 0:
                                 if roll < location_chance:
+                                    one.increase_param("infected_others")
                                     other.set_infected(infection_length = self._infection_length_frames)
                                     item.infection_occurences += 1
 
                         elif other_params["infection_status"] == 1:
                             if one_params["infection_status"] == 0:
                                 if roll < location_chance:
+                                    other.increase_param("infected_others")
                                     one.set_infected(infection_length = self._infection_length_frames)
                                     item.infection_occurences += 1
 
@@ -367,11 +377,16 @@ class World:
         states = np.zeros(3)
         colors = []
         for actor in self._actors_list:
-            state = actor.params["infection_status"]
+            params = actor.params
+            state = params["infection_status"]
             states[int(state)] += 1
-            colors.append(actor.params["color"])
+            colors.append(params["color"])
 
         return states, colors
+
+
+    def get_recovered_stats(self):
+        return self._recovered_stats[self._recovered_stats[:,1] != 0]
 
 
     def plot_world(self, ax = None):
@@ -743,8 +758,8 @@ class Actor:
         plt.show()
 
 
-    def frame_forward(self):
-        """ move the actor along the current path if status is 'moving'"""
+    def frame_forward(self, global_time):
+        """ general behavior for all actors on each frame """
         if isinstance(self._current_container, CommonArea):
             self._common_timer += 1
             if self._common_timer > self._common_timer_max:
@@ -866,6 +881,19 @@ class Actor:
             self._params[param] = value
         else:
             print(f"Attempted to set param {param} for object {self} with value {value}, but key does not exist...")
+
+
+    def increase_param(self, param, value = 1):
+        """ Increase the value of a given parameter in the params dictionary
+        
+        Keyword arguments:
+        value -- how much to increase the parameter (default 1)
+        """
+
+        if param in self._params:
+            self._params[param] += value
+        else:
+            print(f"Attempted to increase param {param} for object {self} with value {value}, but key does not exist...")
 
 
     def _h(self, position, target_position):
@@ -996,17 +1024,20 @@ class Person(Actor):
         self._params["basic_speed"] = 0.45
 
         self._params["behavior"] = "normal"
+        self._params["infected_others"] = 0
+        self._params["became_immune"] = 0
 
 
-    def frame_forward(self):
+    def frame_forward(self, global_time):
         if self._params["infection_status"] == 1:
             self._infection_duration += 1
             if self._infection_duration > self._infection_length:
                 """ become immune """
                 self._params["infection_status"] = 2
                 self._params["color"] = "green"
+                self._params["became_immune"] = global_time
                 self._infection_duration = 0
-        return Actor.frame_forward(self)
+        return Actor.frame_forward(self, global_time)
 
 
     def set_infected(self, infection_length = 100):
