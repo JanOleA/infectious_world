@@ -1,22 +1,22 @@
 {
-    "mapfile": "map.png",
-    "sim_days": 10,
-    "num_inhabitants": 400,
-    "initial_infected": 10,
-    "day_length": 500,
+    "mapfile": "map9090.png",
+    "sim_days": 50,
+    "num_inhabitants": 4000,
+    "initial_infected": 5,
+    "day_length": 800,
     "worker_ratio": 0.6,
     "work_length_factor": 0.3,
     "workend_common_chance": 0.03,
     "home_common_chance": 0.005,
-    "infection_chance": 0.3,
-    "infection_length": 2,
+    "infection_chance": 0.08,
+    "infection_length": 5,
     "lockdown_ratio": 1,
     "lockdown_chance": 0,
     "object_infection_modifiers": {
         "park": 1,
-        "road": 3.5,
+        "road": 3,
         "house": 2,
-        "work": 1.2,
+        "work": 1.3,
         "common": 1.4
     }
 }

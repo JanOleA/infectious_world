@@ -2,22 +2,22 @@ from sim import InfectSim
 import matplotlib.pyplot as plt
 import json
 
-sim_name = "fullmixed"
-mapfile = "mixedmap.png"
+sim_name = "halfmixed"
+mapfile = "mixedmap_half.png"
 
 params = {"mapfile": mapfile}
 
 # number of days to simulate
-params["sim_days"] = 50
+params["sim_days"] = 30
 
 # inhabitants in the world
-params["num_inhabitants"] = 2000
+params["num_inhabitants"] = 1000
 
 # number of infected inhabitants at the beginning of the simulation
 params["initial_infected"] = 5
 
 # length of each day in frames
-params["day_length"] = 700
+params["day_length"] = 500
 
 # ratio of inhabitants who are active workers
 params["worker_ratio"] = 0.6
@@ -33,7 +33,7 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.13
+params["infection_chance"] = 0.15
 
 # how many days the infection lasts on average
 params["infection_length"] = 5
@@ -50,10 +50,10 @@ params["lockdown_chance"] = 0
 # this is multiplied with the infection chance when a person is in this type of object
 object_infection_modifiers = {}
 object_infection_modifiers["park"] = 1
-object_infection_modifiers["road"] = 4
-object_infection_modifiers["house"] = 3
+object_infection_modifiers["road"] = 3.5
+object_infection_modifiers["house"] = 2
 object_infection_modifiers["work"] = 1.2
-object_infection_modifiers["common"] = 1.5
+object_infection_modifiers["common"] = 1.4
 params["object_infection_modifiers"] = object_infection_modifiers
 
 with open(f"sim_params/{sim_name}.json", "w") as outfile:
@@ -65,5 +65,5 @@ simulation.make_infection_heatmap()
 simulation.plot_infection_heatmap()
 simulation.plot_SIR_graph()
 simulation.plot_computation_time()
-anim = simulation.animation(skipframes = 2, plot_width = 8, save_anim = True)
+anim = simulation.animation(skipframes = 2, plot_width = 10, save_anim = False)
 plt.show()

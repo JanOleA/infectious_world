@@ -80,6 +80,7 @@ class InfectSim:
 
         R_eval_time = int(self.infection_length*self.day_length*1.1)
         R0_max_time = int(self.infection_length*self.day_length*1.2)
+        gfactor_interval = int(self.day_length)
 
         current_infected = self.initial_infected
         lockdown_initiated = False
@@ -106,9 +107,11 @@ class InfectSim:
                 if len(recovered_recently) > 0:
                     self.R_history[i + 1] = np.average(recovered_recently)
                     if self.world.global_time < R0_max_time:
-                        R0 = np.average(self.R_history[R_eval_time + 1: R0_max_time])
-                    if self.state_history[int(i - self.infection_length*self.day_length)][1] != 0:
-                        self.mult_history[i + 1] = current_infected/self.state_history[int(i - self.infection_length*self.day_length)][1]
+                        R0 = np.average(self.R_history[R_eval_time + 1: min(i + 2, R0_max_time)])
+                    
+            if self.world.global_time > gfactor_interval:
+                if self.state_history[int(i - gfactor_interval + 1)][1] != 0:
+                    self.mult_history[i + 1] = current_infected/self.state_history[i - gfactor_interval + 1][1]
 
             if i % 10 == 0:
                 print(" "*len(s), end = "\r")
@@ -194,6 +197,7 @@ class InfectSim:
         l4 = ax2.plot(day_array, R_plot, "--", color = "orange", label="R value")
         l5 = ax2.plot(day_array, self.mult_history, "--", color = "grey", label="growth factor", linewidth = 0.5)
         ax2.set_ylabel("R value / growth factor", color = "orange")
+        ax2.axhline(1, day_array[0], day_array[-1], color = "grey", linestyle = "--")
         ax2.tick_params(axis='y', colors = "orange")
         ax2.set_ylim(0, 5)
 

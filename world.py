@@ -149,6 +149,7 @@ class World:
         self._actor_params = []
 
         work_rolls = np.random.random(size = self._num_actors)
+        workplace_distances = np.zeros(len(self._workplace_list))
         
         s = ""
         for i in range(self._num_actors):
@@ -163,7 +164,14 @@ class World:
                 house = np.random.choice(self._house_list)
 
             new_person = Person(house.position[0], house.position[1], house, self._map)
-            workplace = np.random.choice(self._workplace_list)
+
+            for j, workplace in enumerate(self._workplace_list):
+                workplace_distances[j] = np.linalg.norm(new_person.position - workplace.position)
+
+            workplace_distances_inv = np.max(workplace_distances) - workplace_distances
+            workplace_chances = workplace_distances_inv/np.sum(workplace_distances_inv)
+        
+            workplace = np.random.choice(self._workplace_list, p = workplace_chances)
             new_person.set_workplace(self._map, workplace)
             if work_rolls[i] < self._worker_ratio:
                 new_person.set_param("active_worker", True)
