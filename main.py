@@ -1,7 +1,7 @@
 from sim import InfectSim
 import matplotlib.pyplot as plt
 
-sim_name = "fullmixed_lockdown"
+sim_name = "fullmixed"
 mapfile = "mixedmap.png"
 
 params = {}
@@ -13,7 +13,7 @@ params["sim_days"] = 50
 params["num_inhabitants"] = 2000
 
 # number of infected inhabitants at the beginning of the simulation
-params["initial_infected"] = 10
+params["initial_infected"] = 1
 
 # length of each day in frames
 params["day_length"] = 700
@@ -32,16 +32,19 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.13
+params["infection_chance"] = 0.15
 
 # how many days the infection lasts
-params["infection_length"] = 6
+params["infection_length"] = 5
 
 # ratio of inhabitants that must be infected for lockdown to be put into effect
-params["lockdown_ratio"] = 0.3
+params["lockdown_ratio"] = 1
 
-# chance for any inhabitant to agree with the lockdown
-params["lockdown_chance"] = 0.8
+# chance for any inhabitant to go into lockdown
+params["lockdown_chance"] = 0
+
+# chance for any inhabitant in lockdown to return to normal behavior on any day
+# params["lockdown_break_chance"] = 0.1 TODO: Implement
 
 # this is multiplied with the infection chance when a person is in this type of object
 object_infection_modifiers = {}

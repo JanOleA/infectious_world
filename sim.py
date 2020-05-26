@@ -6,6 +6,7 @@ import time
 from world import World
 import seaborn as sns
 import time
+import os
 
 class InfectSim:
     def __init__(self, mapfile, params, sim_name):
@@ -43,6 +44,7 @@ class InfectSim:
                            workend_common_chance = self.workend_common_chance,
                            home_common_chance = self.home_common_chance,
                            infection_chance = self.infection_chance,
+                           initial_infected = self.initial_infected,
                            infection_length = self.infection_length,
                            object_infection_modifiers = self.object_infection_modifiers)
 
@@ -104,6 +106,22 @@ class InfectSim:
         print(f"Simulation completed... Time taken: {int(minutes)}:{int(seconds)}")
         self.map = self.world.get_map()
 
+        if not os.path.exists(f"{os.getcwd()}/output"):
+            os.mkdir(f"{os.getcwd()}/output")
+        if not os.path.exists(f"{os.getcwd()}/output/{self.sim_name}"):
+            os.mkdir(f"{os.getcwd()}/output/{self.sim_name}")
+
+        self.output_dir = f"{os.getcwd()}/output/{self.sim_name}"
+
+        output_data = [self.map,
+                       self.im,
+                       self.position_history,
+                       self.state_history,
+                       self.day_length]
+
+        print("Saving data...")
+        np.save(f"{self.output_dir}/data.npy", output_data)
+
 
     def make_infection_heatmap(self):
         map_ = self.map
@@ -128,7 +146,7 @@ class InfectSim:
                     extent = hmap.get_xlim() + hmap.get_ylim(),
                     zorder = 1)
 
-        if save_plot: plt.savefig(f"plots/infection_heatmap_{self.sim_name}.pdf", dpi = 400)
+        if save_plot: plt.savefig(f"{self.output_dir}/infection_heatmap.pdf", dpi = 400)
 
 
     def plot_SIR_graph(self, save_plot = True):
@@ -141,7 +159,7 @@ class InfectSim:
         plt.legend()
         plt.xlabel("Day")
         plt.ylabel("Inhabitants")
-        if save_plot: plt.savefig(f"plots/infection_development_{self.sim_name}.pdf", dpi = 400)
+        if save_plot: plt.savefig(f"{self.output_dir}/infection_development.pdf", dpi = 400)
 
 
     def plot_computation_time(self, save_plot = True):
@@ -157,7 +175,7 @@ class InfectSim:
         plt.plot(day_comptimes)
         plt.xlabel("Day")
         plt.ylabel("Computation time")
-        if save_plot: plt.savefig(f"plots/comp_time_{self.sim_name}.pdf", dpi = 400)
+        if save_plot: plt.savefig(f"{self.output_dir}/comp_time.pdf", dpi = 400)
 
     
     def animation(self, skipframes = 1, fps = 30, plot_width = 13, max_frames = None, save_anim = False):
@@ -176,7 +194,7 @@ class InfectSim:
                        initial_positions[:,1],
                        c = self.color_history[0], s = 5, zorder = 4)
 
-        day_length = self.world.day_length
+        day_length = self.day_length
 
         print("Animating...")
         def animate(i):
@@ -194,5 +212,5 @@ class InfectSim:
         anim = animation.FuncAnimation(fig, animate, frames=max_frames//skipframes, interval=20)
         if save_anim:
             print("Saving animation...")
-            anim.save(f"movies/movie_{self.sim_name}.mp4", writer=writer)
+            anim.save(f"{self.output_dir}/movie.mp4", writer=writer)
         return anim
