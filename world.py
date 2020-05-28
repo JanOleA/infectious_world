@@ -1134,11 +1134,14 @@ class Person(Actor):
                 and self._params["infection_status"] != 4):
             if self._params["infection_status"] == 1:
                 self._params["infection_status"] = 3 # died from infection
+                self._params["color"] = "black"
+                self._params["died"] = global_time
             elif self._params["allow_natural_deaths"]:
                 self._params["infection_status"] = 4 # natural death
+                self._params["color"] = "black"
+                self._params["died"] = global_time
             
-            self._params["color"] = "black"
-            self._params["died"] = global_time
+            
 
         if self._params["infection_status"] == 1:
             self._infection_duration += 1

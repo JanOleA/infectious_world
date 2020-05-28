@@ -1,6 +1,6 @@
 {
     "mapfile": "map.png",
-    "sim_days": 30,
+    "sim_days": 40,
     "num_inhabitants": 600,
     "initial_infected": 10,
     "day_length": 500,
@@ -13,7 +13,7 @@
     "lockdown_ratio": 1,
     "lockdown_chance": 0,
     "disease_health_impact": 4.29,
-    "allow_natural_deaths": true,
+    "allow_natural_deaths": false,
     "object_infection_modifiers": {
         "park": 1,
         "road": 3.5,
