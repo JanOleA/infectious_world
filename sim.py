@@ -33,6 +33,7 @@ class InfectSim:
         self.lockdown_ratio = params["lockdown_ratio"]
         self.lockdown_chance = params["lockdown_chance"]
         self.disease_health_impact = params["disease_health_impact"]
+        self.allow_natural_deaths = params["allow_natural_deaths"]
 
         self.expected_death_rate = death_rate(5 - self.disease_health_impact)*self.infection_length
 
@@ -56,7 +57,8 @@ class InfectSim:
                            initial_infected = self.initial_infected,
                            infection_length = self.infection_length,
                            object_infection_modifiers = self.object_infection_modifiers,
-                           disease_health_impact = self.disease_health_impact)
+                           disease_health_impact = self.disease_health_impact,
+                           allow_natural_deaths = self.allow_natural_deaths)
 
         max_frames = self.max_frames
         day_length = self.day_length
@@ -66,7 +68,7 @@ class InfectSim:
         self.position_history = np.zeros((max_frames + 1, num_inhabitants, 2))
         self.position_history[0] = self.world.get_actor_plotpositions()
 
-        self.state_history = np.zeros((max_frames + 1, 4))
+        self.state_history = np.zeros((max_frames + 1, 5))
         self.color_history = np.empty((max_frames + 1, num_inhabitants), dtype=str)
 
         self.state_history[0], self.color_history[0] = self.world.get_states_and_colors()
@@ -141,10 +143,11 @@ class InfectSim:
         print(f"Simulation completed... Time taken: {int(minutes):02d}:{int(seconds):02d}")
 
         print(f"Final states:")
-        print(f"S: {self.state_history[-1][0]}")
-        print(f"I: {self.state_history[-1][1]}")
-        print(f"R: {self.state_history[-1][2]}")
-        print(f"D: {self.state_history[-1][3]}")
+        print(f" S: {self.state_history[-1][0]}")
+        print(f" I: {self.state_history[-1][1]}")
+        print(f" R: {self.state_history[-1][2]}")
+        print(f"DI: {self.state_history[-1][3]}")
+        print(f"DN: {self.state_history[-1][4]}")
 
         self.map = self.world.get_map()
 
@@ -243,10 +246,18 @@ class InfectSim:
         fig, ax = plt.subplots(figsize = (8,8))
         state_history = self.state_history
         day_array = self.day_array
-        l1 = ax.plot(day_array, state_history[:,0], label = "susceptible", color = "blue")
-        l2 = ax.plot(day_array, state_history[:,1], label = "infected", color = "red")
-        l3 = ax.plot(day_array, state_history[:,2], label = "recovered", color = "green")
-        l4 = ax.plot(day_array, state_history[:,3], label = "dead", color = "black")
+
+        infected = state_history[:,1]
+        dead_inf = infected + state_history[:,3]
+        recovered = dead_inf + state_history[:,2]
+        susceptible = recovered + state_history[:,0]
+        dead_natural = susceptible + state_history[:,4]
+        l1 = [ax.fill_between(day_array, infected, label = "infected", color = "red", alpha = 0.3)]
+        l2 = [ax.fill_between(day_array, infected, dead_inf, label = "dead (from infection)", color = "black", alpha = 0.3)]
+        l3 = [ax.fill_between(day_array, dead_inf, recovered, label = "recovered", color = "green", alpha = 0.3)]
+        l4 = [ax.fill_between(day_array, recovered, susceptible, label = "susceptible", color = "blue", alpha = 0.3)]
+        l5 = [ax.fill_between(day_array, susceptible, dead_natural, label = "dead (natural)", color = "purple", alpha = 0.3)]
+
         ax.set_ylabel("Inhabitants")
 
         ax2 = ax.twinx()
@@ -258,9 +269,8 @@ class InfectSim:
 
         R0_est = np.nanmean(R_plot/state_history[:,0]*state_history[1,0]*(day_array[-1] - day_array))/np.mean(day_array)
 
-        l5 = ax2.plot(day_array, R_plot, "--", color = "orange", label = "R value")
-        l6 = ax2.plot(day_array, self.mult_history, "--", color = "grey", label = "growth factor", linewidth = 0.5)
-        l7 = [ax2.axhline(R0_est, day_array[0], day_array[-1], color = "black", linestyle = "--", label = "R0 estimate")]
+        l6 = ax2.plot(day_array, R_plot, "--", color = "orange", label = "R value")
+        l7 = ax2.plot(day_array, self.mult_history, "--", color = "grey", label = "growth factor", linewidth = 0.5)
 
         ax2.set_ylabel("R value / growth factor", color = "orange")
         ax2.axhline(1, day_array[0], day_array[-1], color = "orange", linestyle = "--")
@@ -271,9 +281,11 @@ class InfectSim:
         
         lns = l1 + l2 + l3 + l4 + l5 + l6 + l7
         labs = [l.get_label() for l in lns]
-        ax.legend(lns, labs, loc = 1)
+        ax.legend(lns, labs, loc = 2)
 
         plt.title("SIR plot")
+
+        print(f"R0 estimate: {R0_est}")
 
         if save_plot: plt.savefig(f"{self.output_dir}/infection_development.pdf", dpi = 400)
 
@@ -282,15 +294,17 @@ class InfectSim:
         plt.figure(figsize = (8,8))
         dr_recovered = np.full(self.state_history[:,3].shape, np.inf)
         dr_recovered[self.state_history[:,2] != 0] = (self.state_history[:,3])[self.state_history[:,2] != 0]/((self.state_history[:,2])[self.state_history[:,2] != 0])
-        dr_cumulative = self.state_history[:,3]/(self.state_history[:,2] + self.state_history[:,1])
+        dr_cumulative = self.state_history[:,3]/(self.state_history[:,2] + self.state_history[:,1] + self.state_history[:,4])
 
         plt.plot(self.day_array, dr_recovered, color = "red", label = "Death rate (vs. recovered)")
         plt.plot(self.day_array, dr_cumulative, color = "green", label = "Death rate (vs. cumulative num. of infections)")
         plt.hlines(self.expected_death_rate, self.day_array[0], self.day_array[-1], color = "black", linestyle = "--", label = "Expected rate")
         plt.xlabel("Day")
         plt.ylabel("Death rate")
+        plt.ylim(0, 1)
+        plt.legend()
 
-        plt.title("Death rate")
+        plt.title("Death rate (only deaths while infected)")
 
         if save_plot: plt.savefig(f"{self.output_dir}/death_rate.pdf", dpi = 400)
 

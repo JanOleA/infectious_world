@@ -47,9 +47,16 @@ def plot_SIR_graph(state_history, day_length, max_frames, R_history, infection_l
     day_array = np.arange(max_frames + 1)/day_length
 
     fig, ax = plt.subplots(figsize = (8,8))
-    l1 = ax.plot(day_array, state_history[:,0], label = "susceptible", color = "blue")
-    l2 = ax.plot(day_array, state_history[:,1], label = "infected", color = "red")
-    l3 = ax.plot(day_array, state_history[:,2], label = "recovered", color = "green")
+    infected = state_history[:,1]
+    dead_inf = infected + state_history[:,3]
+    recovered = dead_inf + state_history[:,2]
+    susceptible = recovered + state_history[:,0]
+    dead_natural = susceptible + state_history[:,4]
+    l1 = [ax.fill_between(day_array, infected, label = "infected", color = "red", alpha = 0.3)]
+    l2 = [ax.fill_between(day_array, infected, dead_inf, label = "dead (from infection)", color = "black", alpha = 0.3)]
+    l3 = [ax.fill_between(day_array, dead_inf, recovered, label = "recovered", color = "green", alpha = 0.3)]
+    l4 = [ax.fill_between(day_array, recovered, susceptible, label = "susceptible", color = "blue", alpha = 0.3)]
+    l5 = [ax.fill_between(day_array, susceptible, dead_natural, label = "dead (natural)", color = "purple", alpha = 0.3)]
     ax.set_ylabel("Inhabitants")
 
     ax2 = ax.twinx()
@@ -59,10 +66,7 @@ def plot_SIR_graph(state_history, day_length, max_frames, R_history, infection_l
     R_plot = np.zeros(len(day_array))
     R_plot[:len(R_history)] = R_history
 
-    R0_est = np.nanmean(R_plot/state_history[:,0]*state_history[1,0]*(day_array[-1] - day_array))/np.mean(day_array)
-
-    l4 = ax2.plot(day_array, R_plot, "--", color = "orange", label = "R value")
-    l5 = [ax2.axhline(R0_est, day_array[0], day_array[-1], color = "black", linestyle = "--", label = "R0 estimate")]
+    l6 = ax2.plot(day_array, R_plot, "--", color = "orange", label = "R value", alpha = 0.5)
 
     ax2.set_ylabel("R value / growth factor", color = "orange")
     ax2.axhline(1, day_array[0], day_array[-1], color = "orange", linestyle = "--")
@@ -71,9 +75,9 @@ def plot_SIR_graph(state_history, day_length, max_frames, R_history, infection_l
 
     plt.xlabel("Day")
     
-    lns = l1 + l2 + l3 + l4 + l5
+    lns = l1 + l2 + l3 + l4 + l5 + l6
     labs = [l.get_label() for l in lns]
-    ax.legend(lns, labs, loc = 1)
+    ax.legend(lns, labs, loc = 2)
 
 
 plot_SIR_graph(state_history, day_length, max_frames, R_history, params["infection_length"])

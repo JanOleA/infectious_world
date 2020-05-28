@@ -20,7 +20,8 @@ class World:
                  initial_infected = 10,
                  infection_length = 2,
                  object_infection_modifiers = None,
-                 disease_health_impact = 3):
+                 disease_health_impact = 3,
+                 allow_natural_deaths = True):
 
         """ Initialize the world and all parameters, generate the map and
         initialize the inhabitants
@@ -39,7 +40,9 @@ class World:
         infection_length -- length of infection in days (default 2)
         object_infection_modifiers -- dictionary containing modifiers for infection rate in each object type
                                       if None, all are set to 1 (default None)
-
+        disease_health_impact -- the health effect having the disease will have on an infected person
+                                 see the 'death chance' method on the Person object for details
+        allow_natural_deaths -- whether or not people can die even if they are not infected
         """
 
         in_map = in_map[::-1]
@@ -57,6 +60,7 @@ class World:
         self._infection_length_days = infection_length
         self._infection_length_frames = infection_length*day_length
         self._disease_health_impact = disease_health_impact
+        self._allow_natural_deaths = allow_natural_deaths
 
         if object_infection_modifiers is None:
             object_infection_modifiers = {}
@@ -192,6 +196,7 @@ class World:
             if work_rolls[i] < self._worker_ratio:
                 new_person.set_param("active_worker", True)
             new_person.set_preferred_commonarea(self._commonarea_list)
+            new_person.set_param("allow_natural_deaths", self._allow_natural_deaths)
             house.add_dweller(new_person)
             self._actors_list.append(new_person)
             self._actor_positions.append(new_person.position)
@@ -220,7 +225,7 @@ class World:
         behavior_rolls = np.random.random(size = self._num_actors)
         death_rolls = np.random.random(size = self._num_actors)
 
-        states = np.zeros(4)
+        states = np.zeros(5)
         colors = []
 
         self.infect()
@@ -236,7 +241,8 @@ class World:
 
             if actor_params["infection_status"] == 2:
                 self._recovered_stats[i] = (actor_params["infected_others"], actor_params["became_immune"])
-            elif actor_params["infection_status"] == 4 and actor_params["cause_of_death"] == "infection":
+            elif actor_params["infection_status"] == 3:
+                # only add those who died while infected
                 self._recovered_stats[i] = (actor_params["infected_others"], actor_params["died"])
 
             params = actor.params
@@ -407,7 +413,7 @@ class World:
 
     
     def get_actor_states_num(self):
-        states = np.zeros(4)
+        states = np.zeros(5)
         for actor in self._actors_list:
             state = actor.params["infection_status"]
             states[int(state)] += 1
@@ -416,7 +422,7 @@ class World:
 
     
     def get_states_and_colors(self):
-        states = np.zeros(4)
+        states = np.zeros(5)
         colors = []
         for actor in self._actors_list:
             params = actor.params
@@ -439,6 +445,7 @@ class World:
             actor.reset()
             if work_rolls[i] < self._worker_ratio:
                 actor.set_param("active_worker", True)
+            actor.set_param("allow_natural_deaths", self._allow_natural_deaths)
             self._recovered_stats[i] = (0,0)
             self._actor_params[i] = actor.params
             self._actor_positions[i] = actor.position
@@ -1103,7 +1110,8 @@ class Person(Actor):
         # 0 = susceptible
         # 1 = infected
         # 2 = recovered
-        # 3 = dead
+        # 3 = dead from infection
+        # 4 = natural death
         self._params["infection_status"] = 0
         self._params["infection_chance_modifier"] = 1 # multiplied with the infection chance of the current area the person is in
                                                       # applies for infecting _other_ people
@@ -1116,18 +1124,19 @@ class Person(Actor):
         self._params["died"] = 0
         self._params["age"] = 0
         self._params["health"] = 5
-        self._params["cause_of_death"] = None
+        self._params["allow_natural_deaths"] = True
         self._infection_duration = 0
 
 
     def frame_forward(self, global_time, death_roll):
-        if death_roll < self.death_chance/self._day_length and self._params["infection_status"] != 3:
+        if (death_roll < self.death_chance/self._day_length
+                and self._params["infection_status"] != 3
+                and self._params["infection_status"] != 4):
             if self._params["infection_status"] == 1:
-                self._params["cause_of_death"] = "infection"
-            else:
-                self._params["cause_of_death"] = "natural"
-
-            self._params["infection_status"] = 3
+                self._params["infection_status"] = 3 # died from infection
+            elif self._params["allow_natural_deaths"]:
+                self._params["infection_status"] = 4 # natural death
+            
             self._params["color"] = "black"
             self._params["died"] = global_time
 
@@ -1141,7 +1150,7 @@ class Person(Actor):
                 self._params["health"] = self._params["health"] + self._disease_health_impact
                 self._infection_duration = 0
 
-        if self._params["infection_status"] != 3:
+        if self._params["infection_status"] != 3 and self._params["infection_status"] != 4:
             return Actor.frame_forward(self, global_time)
         else:
             return self.position # dead

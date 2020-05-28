@@ -2,13 +2,13 @@ from sim import InfectSim
 import matplotlib.pyplot as plt
 import json
 
-sim_name = "test"
+sim_name = "fullmixed"
 mapfile = "map.png"
 
 params = {"mapfile": mapfile}
 
 # number of days to simulate
-params["sim_days"] = 25
+params["sim_days"] = 30
 
 # inhabitants in the world
 params["num_inhabitants"] = 600
@@ -33,7 +33,7 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.3
+params["infection_chance"] = 0.2
 
 # how many days the infection lasts on average
 params["infection_length"] = 5
@@ -49,6 +49,9 @@ params["lockdown_chance"] = 0
 
 # how much the disease will reduce the health of an infected person
 params["disease_health_impact"] = 4.29
+
+# whether or not people can die natural deaths
+params["allow_natural_deaths"] = True
 
 # this is multiplied with the infection chance when a person is in this type of object
 object_infection_modifiers = {}
