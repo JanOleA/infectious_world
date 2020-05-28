@@ -23,6 +23,22 @@ class World:
 
         """ Initialize the world and all parameters, generate the map and
         initialize the inhabitants
+
+        Keyword arguments:
+        num_inhabitants -- number of actors in the simulation (default 500)
+        worker_ratio -- chance that an actor will be an active worker at the start (default 0.5)
+        day_length -- length of days in simulation frames (default 500)
+        work_length_factor -- fraction of day that defines the length between work start and work end (default 0.3)
+        workend_common_chance -- chance that any actor will stop by a commonarea after they leave work (default 0.05)
+        home_common_chance -- chance every frame that a non active-worker
+                              will go to a commonarea during the day (default 0.005)
+        infection_chance -- infection chance if an actor spends one entire day in the same area as an infected actor
+                            (the chance is divided by number of frames in a day and applied per frame) (default 0.1)
+        initial_infected -- infected actors at the start of the simulation (default = 10)
+        infection_length -- length of infection in days (default 2)
+        object_infection_modifiers -- dictionary containing modifiers for infection rate in each object type
+                                      if None, all are set to 1 (default None)
+
         """
 
         in_map = in_map[::-1]
@@ -397,6 +413,31 @@ class World:
         return self._recovered_stats[self._recovered_stats[:,1] != 0]
 
 
+    def reset(self):
+        """ Resets the simulation to the beginning, with new initial infected actors """
+        work_rolls = np.random.random(size = self._num_actors)
+
+        for i, actor in enumerate(self._actors_list):
+            actor.reset()
+            if work_rolls[i] < self._worker_ratio:
+                actor.set_param("active_worker", True)
+            self._recovered_stats[i] = (0,0)
+            self._actor_params[i] = actor.params
+            self._actor_positions[i] = actor.position
+            self._actor_plotpositions[i] = actor.plotpos
+        for row in self._map:
+            for item in row:
+                item.reset()
+        self._global_time = 0
+
+        initial_infect_inds = np.random.choice(np.arange(self._num_actors), self._initial_infected)
+
+        for i in initial_infect_inds:
+            actor = self._actors_list[i]
+            actor.set_infected(infection_length = self._infection_length_frames)
+            self._actor_params[i] = actor.params
+
+
     def plot_world(self, ax = None):
         """ Plot the world in its current state """
         """
@@ -423,6 +464,7 @@ class World:
         ax.set_xlim(-1, self._world_size[1])
         
         plt.axis("equal")
+
 
     @property
     def global_time(self):
@@ -522,6 +564,11 @@ class MapObject:
             return True
         else:
             return False
+
+
+    def reset(self):
+        self.infection_occurences = 0
+
 
     @property
     def position(self):
@@ -657,7 +704,19 @@ class Actor:
 
         self._init_params()
 
-    
+
+    def reset(self):
+        """ Reset the actor to the state at the beginning of the simulation """
+        self._params = {}
+        self._init_params()
+        self._x = self._xhome
+        self._y = self._yhome
+        self._current_container.remove_actor(self)
+        self._current_container = self.homeplace
+        self._current_container.add_actor(self)
+        self._status = "idle"
+
+
     def set_workplace(self, map_, workplace):
         self._xwork, self._ywork = workplace.position
         self._workplace = workplace
@@ -1034,6 +1093,9 @@ class Person(Actor):
         self._params["behavior"] = "normal"
         self._params["infected_others"] = 0
         self._params["became_immune"] = 0
+        self._params["age"] = 0
+        self._params["health"] = 5
+        self._infection_duration = 0
 
 
     def frame_forward(self, global_time):

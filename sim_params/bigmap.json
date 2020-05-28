@@ -8,7 +8,7 @@
     "work_length_factor": 0.3,
     "workend_common_chance": 0.03,
     "home_common_chance": 0.005,
-    "infection_chance": 0.08,
+    "infection_chance": 0.085,
     "infection_length": 5,
     "lockdown_ratio": 1,
     "lockdown_chance": 0,

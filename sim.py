@@ -117,7 +117,7 @@ class InfectSim:
                 print(" "*len(s), end = "\r")
                 minutes = int(eta)
                 seconds = eta%1*60
-                s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d} | Current infected = {current_infected} | R0 = {R0:3.3f}"
+                s = f"{i/max_frames*100:3.1f}% | ETA = {minutes:02d}:{int(seconds):02d} | Current infected = {current_infected} | R0 (this run) = {R0:3.3f}"
                 print(s, end = "\r")
 
             time_now = time.time()
@@ -146,10 +146,55 @@ class InfectSim:
                        self.position_history,
                        self.state_history,
                        self.color_history,
-                       self.day_length]
+                       self.day_length,
+                       self.R_history]
 
         print("Saving data...")
         np.save(f"{self.output_dir}/data.npy", output_data)
+
+
+    def calculate_R0(self, iterations = 5):
+        """ Runs the beginning of the simulation _iterations_ number of times
+        and returns the average R0 value.
+        """
+        R0 = np.nan
+        s = ""
+
+        R_eval_time = int(self.infection_length*self.day_length*1.1)
+        R0_max_time = int(self.infection_length*self.day_length*1.2)
+
+        R0_list = []
+
+        print(f"Calculating R0 with {iterations} iterations...")
+        s = ""
+
+        """ MAIN SIMULATION LOOP """
+        for itr in range(iterations):
+            R_history = np.full(R0_max_time + 1, np.nan)
+            print(f"Iteration {itr}...", end = "\r")
+            for i in range(R0_max_time):
+                self.world.frame_forward()
+                recovered_stats = self.world.get_recovered_stats()
+
+                if self.world.global_time > R_eval_time:
+                    recovered_recently = recovered_stats[:,0][(self.world.global_time - recovered_stats[:,1]) < R_eval_time]
+                    if len(recovered_recently) > 0:
+                        R_history[i + 1] = np.average(recovered_recently)
+                        if self.world.global_time < R0_max_time:
+                            R0 = np.average(R_history[R_eval_time + 1: min(i + 2, R0_max_time)])
+                        
+                if i%10 == 0:
+                    s = f"Iteration {itr}... {i/R0_max_time*100:2.2f}%   R0: {R0:2.3f}"
+                    print(s, end = "\r")
+
+            print(" "*len(s), end = "\r")
+            print(f"Iteration {itr}: {R0:2.3f}")
+            R0_list.append(R0)
+            R0 = np.nan
+            self.world.reset()
+        print(f"Average R0: {np.mean(R0_list):2.3f}")
+
+        return np.mean(R0_list)
 
 
     def make_infection_heatmap(self):
@@ -194,16 +239,20 @@ class InfectSim:
         R_plot = np.zeros(len(day_array))
         R_plot[:len(R_history)] = R_history
 
-        l4 = ax2.plot(day_array, R_plot, "--", color = "orange", label="R value")
-        l5 = ax2.plot(day_array, self.mult_history, "--", color = "grey", label="growth factor", linewidth = 0.5)
+        R0_est = np.nanmean(R_plot/state_history[:,0]*state_history[1,0]*(day_array[-1] - day_array))/np.mean(day_array)
+
+        l4 = ax2.plot(day_array, R_plot, "--", color = "orange", label = "R value")
+        l5 = ax2.plot(day_array, self.mult_history, "--", color = "grey", label = "growth factor", linewidth = 0.5)
+        l6 = [ax2.axhline(R0_est, day_array[0], day_array[-1], color = "black", linestyle = "--", label = "R0 estimate")]
+
         ax2.set_ylabel("R value / growth factor", color = "orange")
-        ax2.axhline(1, day_array[0], day_array[-1], color = "grey", linestyle = "--")
+        ax2.axhline(1, day_array[0], day_array[-1], color = "orange", linestyle = "--")
         ax2.tick_params(axis='y', colors = "orange")
         ax2.set_ylim(0, 5)
 
         plt.xlabel("Day")
         
-        lns = l1 + l2 + l3 + l4 + l5
+        lns = l1 + l2 + l3 + l4 + l5 + l6
         labs = [l.get_label() for l in lns]
         ax.legend(lns, labs, loc = 1)
 
