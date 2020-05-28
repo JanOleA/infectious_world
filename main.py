@@ -8,13 +8,13 @@ mapfile = "map.png"
 params = {"mapfile": mapfile}
 
 # number of days to simulate
-params["sim_days"] = 10
+params["sim_days"] = 50
 
 # inhabitants in the world
 params["num_inhabitants"] = 400
 
 # number of infected inhabitants at the beginning of the simulation
-params["initial_infected"] = 1
+params["initial_infected"] = 10
 
 # length of each day in frames
 params["day_length"] = 500
@@ -33,19 +33,22 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.7
+params["infection_chance"] = 0.4
 
 # how many days the infection lasts on average
-params["infection_length"] = 3
+params["infection_length"] = 5
 
 # ratio of inhabitants that must be infected for lockdown to be put into effect
 params["lockdown_ratio"] = 1
 
-# chance for any inhabitant to go into lockdown
+# chance for any inhabitant to go into lockdown when it is put into effect
 params["lockdown_chance"] = 0
 
 # chance for any inhabitant in lockdown to return to normal behavior on any day
 # params["lockdown_break_chance"] = 0.1 TODO: Implement
+
+# how much the disease will reduce the health of an infected person
+params["disease_health_impact"] = 3.07598
 
 # this is multiplied with the infection chance when a person is in this type of object
 object_infection_modifiers = {}
@@ -60,11 +63,12 @@ with open(f"sim_params/{sim_name}.json", "w") as outfile:
     json.dump(params, outfile, indent = 4)
 
 simulation = InfectSim(mapfile, params, sim_name)
-simulation.calculate_R0(iterations = 10)
+simulation.calculate_R0(iterations = 3)
 simulation.run_sim()
 simulation.make_infection_heatmap()
 simulation.plot_infection_heatmap()
 simulation.plot_SIR_graph()
+simulation.plot_death_rate()
 simulation.plot_computation_time()
 anim = simulation.animation(skipframes = 2, plot_width = 10, save_anim = False)
 plt.show()

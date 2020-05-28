@@ -19,7 +19,8 @@ class World:
                  infection_chance = 0.1,
                  initial_infected = 10,
                  infection_length = 2,
-                 object_infection_modifiers = None):
+                 object_infection_modifiers = None,
+                 disease_health_impact = 3):
 
         """ Initialize the world and all parameters, generate the map and
         initialize the inhabitants
@@ -55,6 +56,7 @@ class World:
         self._initial_infected = initial_infected
         self._infection_length_days = infection_length
         self._infection_length_frames = infection_length*day_length
+        self._disease_health_impact = disease_health_impact
 
         if object_infection_modifiers is None:
             object_infection_modifiers = {}
@@ -97,8 +99,7 @@ class World:
 
             for j, color in enumerate(line):
                 progress = (i*self._world_size[1] + j)/(in_map.size/3)*100
-                print(" "*len(s), end = "\r")
-                s = f"{progress:3.1f}%"
+                s = f"{progress:3.1f}%    "
                 print(s, end = "\r")
                 y = i
                 x = j
@@ -170,8 +171,7 @@ class World:
         s = ""
         for i in range(self._num_actors):
             if i%10 == 0:
-                print(" "*len(s), end = "\r")
-                s = f"{i/self._num_actors*100:3.1f}%"
+                s = f"{i/self._num_actors*100:3.1f}%     "
                 print(s, end = "\r")
 
             if i < len(self._house_list) and self._num_actors >= len(self._house_list):
@@ -179,7 +179,7 @@ class World:
             else:
                 house = np.random.choice(self._house_list)
 
-            new_person = Person(house.position[0], house.position[1], house, self._map)
+            new_person = Person(house.position[0], house.position[1], house, self._map, self._day_length)
 
             for j, workplace in enumerate(self._workplace_list):
                 workplace_distances[j] = np.linalg.norm(new_person.position - workplace.position)
@@ -217,13 +217,18 @@ class World:
     def frame_forward(self):
         """ Step one frame forward in the simulation """
         day_time = self._global_time%self._day_length
-        rolls = np.random.random(size=self._num_actors)
+        behavior_rolls = np.random.random(size = self._num_actors)
+        death_rolls = np.random.random(size = self._num_actors)
+
+        states = np.zeros(4)
+        colors = []
 
         self.infect()
 
         ### this loop defines the main behaviour of persons in this world
         for i, actor in enumerate(self._actors_list):
-            actor_pos = actor.frame_forward(self._global_time)
+            death_roll = death_rolls[i]
+            actor_pos = actor.frame_forward(self._global_time, death_roll)
             self._actor_positions[i] = actor_pos
             self._actor_plotpositions[i] = actor.plotpos
             actor_params = actor.params
@@ -231,8 +236,10 @@ class World:
 
             if actor_params["infection_status"] == 2:
                 self._recovered_stats[i] = (actor_params["infected_others"], actor_params["became_immune"])
+            elif actor_params["infection_status"] == 4:
+                self._recovered_stats[i] = (actor_params["infected_others"], actor_params["died"])
 
-            roll = rolls[i]
+            roll = behavior_rolls[i]
 
             behavior = actor.params["behavior"]
 
@@ -241,7 +248,14 @@ class World:
             elif behavior == "stay_home":
                 self._stay_home_behaviour(actor, roll, day_time)
 
+            params = actor.params
+            state = params["infection_status"]
+            states[int(state)] += 1
+            colors.append(params["color"])
+
         self._global_time += 1
+
+        return states, colors
 
 
     def _normal_actor_behaviour(self, actor, roll, day_time):
@@ -350,14 +364,16 @@ class World:
                             if other_params["infection_status"] == 0:
                                 if roll < location_chance:
                                     one.increase_param("infected_others")
-                                    other.set_infected(infection_length = self._infection_length_frames)
+                                    other.set_infected(infection_length = self._infection_length_frames,
+                                                       health_impact = self._disease_health_impact)
                                     item.infection_occurences += 1
 
                         elif other_params["infection_status"] == 1:
                             if one_params["infection_status"] == 0:
                                 if roll < location_chance:
                                     other.increase_param("infected_others")
-                                    one.set_infected(infection_length = self._infection_length_frames)
+                                    one.set_infected(infection_length = self._infection_length_frames,
+                                                     health_impact = self._disease_health_impact)
                                     item.infection_occurences += 1
 
 
@@ -389,7 +405,7 @@ class World:
 
     
     def get_actor_states_num(self):
-        states = np.zeros(3)
+        states = np.zeros(4)
         for actor in self._actors_list:
             state = actor.params["infection_status"]
             states[int(state)] += 1
@@ -398,7 +414,7 @@ class World:
 
     
     def get_states_and_colors(self):
-        states = np.zeros(3)
+        states = np.zeros(4)
         colors = []
         for actor in self._actors_list:
             params = actor.params
@@ -675,7 +691,7 @@ class CommonArea(MapObject):
 
 class Actor:
     """ Superclass for map actors """
-    def __init__(self, xhome, yhome, homeplace, map_, image_map = None):
+    def __init__(self, xhome, yhome, homeplace, map_, day_length, image_map = None):
         self._homeplace = homeplace
         self._xhome = xhome
         self._yhome = yhome
@@ -692,6 +708,7 @@ class Actor:
         self._stored_paths = []
         self._stored_paths_usage = []
         self._preffered_commonarea = None
+        self._day_length = day_length
 
         self._common_timer_max = 100
         self._common_timer = 0
@@ -775,8 +792,8 @@ class Actor:
             current_path = self.find_path(map_, target, start = self._current_container)
 
             # store new path in stored paths, but first remove the least
-            # used one if there are 20 or more paths stored
-            if len(self._stored_paths) >= 20:
+            # used one if there are 50 or more paths stored
+            if len(self._stored_paths) >= 50:
                 ind_remove = np.argmin(self._stored_paths_usage)
                 self._stored_paths.pop(ind_remove)
                 self._stored_paths_usage.pop(ind_remove)
@@ -825,7 +842,7 @@ class Actor:
         plt.show()
 
 
-    def frame_forward(self, global_time):
+    def frame_forward(self, global_time, death_roll = None):
         """ general behavior for all actors on each frame """
         if isinstance(self._current_container, CommonArea):
             self._common_timer += 1
@@ -1073,8 +1090,8 @@ class Actor:
 
 
 class Person(Actor):
-    def __init__(self, xhome, yhome, homeplace, map_, image_map = None):
-        super().__init__(xhome, yhome, homeplace, map_, image_map)
+    def __init__(self, xhome, yhome, homeplace, map_, day_length, image_map = None):
+        super().__init__(xhome, yhome, homeplace, map_, day_length, image_map)
         self._name = names.get_full_name()
 
 
@@ -1084,6 +1101,7 @@ class Person(Actor):
         # 0 = susceptible
         # 1 = infected
         # 2 = recovered
+        # 3 = dead
         self._params["infection_status"] = 0
         self._params["infection_chance_modifier"] = 1 # multiplied with the infection chance of the current area the person is in
                                                       # applies for infecting _other_ people
@@ -1093,12 +1111,18 @@ class Person(Actor):
         self._params["behavior"] = "normal"
         self._params["infected_others"] = 0
         self._params["became_immune"] = 0
+        self._params["died"] = 0
         self._params["age"] = 0
         self._params["health"] = 5
         self._infection_duration = 0
 
 
-    def frame_forward(self, global_time):
+    def frame_forward(self, global_time, death_roll):
+        if death_roll < self.death_chance/self._day_length and self._params["infection_status"] != 3:
+            self._params["infection_status"] = 3
+            self._params["color"] = "black"
+            self._params["died"] = global_time
+
         if self._params["infection_status"] == 1:
             self._infection_duration += 1
             if self._infection_duration > self._infection_length:
@@ -1106,18 +1130,48 @@ class Person(Actor):
                 self._params["infection_status"] = 2
                 self._params["color"] = "green"
                 self._params["became_immune"] = global_time
+                self._params["health"] = self._params["health"] + self._disease_health_impact
                 self._infection_duration = 0
-        return Actor.frame_forward(self, global_time)
+
+        if self._params["infection_status"] != 3:
+            return Actor.frame_forward(self, global_time)
+        else:
+            return self.position # dead
 
 
-    def set_infected(self, infection_length = 100):
+    def set_infected(self, infection_length = 100, health_impact = 3):
         self._params["infection_status"] = 1
         self._params["color"] = "red"
+        self._params["health"] = self._params["health"] - health_impact
+        self._disease_health_impact = health_impact
         self._infection_duration = 0
         self._infection_length = infection_length + np.random.randint(int(infection_length/20) + 1) - int(infection_length/40)
 
     
     def __str__(self):
         return self._name
+
+    @property
+    def death_chance(self, modifier = 0.1, inf_rate = -1):
+        """ Returns the chance that the person will die with its current health
+        value. With the default values, the chances are as follows:
+        health = 5    -> ~0.0005 (standard)
+        health = 4    ->  0.0008
+        health = 3    -> ~0.0016
+        health = 2    -> ~0.0037
+        health = 1    ->  0.0125
+        health = 0    ->  0.1 (corresponds to the 'modifier' kwarg if inf_rate = -1)
+        health = -0.5 ->  0.8
+        health = -1   ->  inf
+        
+        Keyworg arguments:
+        modifier -- multiplied directly with the chance (default = 0.1)
+        inf_rate -- where the chance to die is infinite (default = -1.0)
+        """
+        health = self._params["health"]
+        if health < inf_rate+1e-3:
+            return np.inf
+        else:
+            return 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
 
 
