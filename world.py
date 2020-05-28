@@ -228,7 +228,7 @@ class World:
         ### this loop defines the main behaviour of persons in this world
         for i, actor in enumerate(self._actors_list):
             death_roll = death_rolls[i]
-            actor_pos = actor.frame_forward(self._global_time, death_roll)
+            actor_pos = actor.frame_forward(self._global_time, death_roll) # this is where the actor actually does their behavior
             self._actor_positions[i] = actor_pos
             self._actor_plotpositions[i] = actor.plotpos
             actor_params = actor.params
@@ -236,22 +236,24 @@ class World:
 
             if actor_params["infection_status"] == 2:
                 self._recovered_stats[i] = (actor_params["infected_others"], actor_params["became_immune"])
-            elif actor_params["infection_status"] == 4:
+            elif actor_params["infection_status"] == 4 and actor_params["cause_of_death"] == "infection":
                 self._recovered_stats[i] = (actor_params["infected_others"], actor_params["died"])
-
-            roll = behavior_rolls[i]
-
-            behavior = actor.params["behavior"]
-
-            if behavior == "normal":
-                self._normal_actor_behaviour(actor, roll, day_time)
-            elif behavior == "stay_home":
-                self._stay_home_behaviour(actor, roll, day_time)
 
             params = actor.params
             state = params["infection_status"]
             states[int(state)] += 1
             colors.append(params["color"])
+
+            roll = behavior_rolls[i]
+
+            behavior = actor.params["behavior"]
+
+            # this is where the next behavior of the actor is set for the next frame
+            if behavior == "normal":
+                self._normal_actor_behaviour(actor, roll, day_time)
+            elif behavior == "stay_home":
+                self._stay_home_behaviour(actor, roll, day_time)
+
 
         self._global_time += 1
 
@@ -1114,11 +1116,17 @@ class Person(Actor):
         self._params["died"] = 0
         self._params["age"] = 0
         self._params["health"] = 5
+        self._params["cause_of_death"] = None
         self._infection_duration = 0
 
 
     def frame_forward(self, global_time, death_roll):
         if death_roll < self.death_chance/self._day_length and self._params["infection_status"] != 3:
+            if self._params["infection_status"] == 1:
+                self._params["cause_of_death"] = "infection"
+            else:
+                self._params["cause_of_death"] = "natural"
+
             self._params["infection_status"] = 3
             self._params["color"] = "black"
             self._params["died"] = global_time

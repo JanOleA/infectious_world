@@ -8,10 +8,10 @@ mapfile = "map.png"
 params = {"mapfile": mapfile}
 
 # number of days to simulate
-params["sim_days"] = 50
+params["sim_days"] = 25
 
 # inhabitants in the world
-params["num_inhabitants"] = 400
+params["num_inhabitants"] = 600
 
 # number of infected inhabitants at the beginning of the simulation
 params["initial_infected"] = 10
@@ -33,7 +33,7 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.4
+params["infection_chance"] = 0.3
 
 # how many days the infection lasts on average
 params["infection_length"] = 5
@@ -48,7 +48,7 @@ params["lockdown_chance"] = 0
 # params["lockdown_break_chance"] = 0.1 TODO: Implement
 
 # how much the disease will reduce the health of an infected person
-params["disease_health_impact"] = 3.07598
+params["disease_health_impact"] = 4.29
 
 # this is multiplied with the infection chance when a person is in this type of object
 object_infection_modifiers = {}
