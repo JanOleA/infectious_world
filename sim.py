@@ -256,7 +256,8 @@ class InfectSim:
         l2 = [ax.fill_between(day_array, infected, dead_inf, label = "dead (from infection)", color = "black", alpha = 0.3)]
         l3 = [ax.fill_between(day_array, dead_inf, recovered, label = "recovered", color = "green", alpha = 0.3)]
         l4 = [ax.fill_between(day_array, recovered, susceptible, label = "susceptible", color = "blue", alpha = 0.3)]
-        l5 = [ax.fill_between(day_array, susceptible, dead_natural, label = "dead (natural)", color = "purple", alpha = 0.3)]
+        if np.sum(state_history[:,4]) >= 1:
+            l5 = [ax.fill_between(day_array, susceptible, dead_natural, label = "dead (natural)", color = "purple", alpha = 0.3)]
 
         ax.set_ylabel("Inhabitants")
 
@@ -279,7 +280,11 @@ class InfectSim:
 
         plt.xlabel("Day")
         
-        lns = l1 + l2 + l3 + l4 + l5 + l6 + l7
+        lns = l1 + l2 + l3 + l4
+        if np.sum(state_history[:,4]) >= 1:
+            lns = lns + l5
+        lns = lns + l6 + l7
+        
         labs = [l.get_label() for l in lns]
         ax.legend(lns, labs, loc = 2)
 

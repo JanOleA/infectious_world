@@ -2,13 +2,13 @@ from sim import InfectSim
 import matplotlib.pyplot as plt
 import json
 
-sim_name = "fullmixed"
+sim_name = "test"
 mapfile = "map.png"
 
 params = {"mapfile": mapfile}
 
 # number of days to simulate
-params["sim_days"] = 30
+params["sim_days"] = 40
 
 # inhabitants in the world
 params["num_inhabitants"] = 600
@@ -51,7 +51,7 @@ params["lockdown_chance"] = 0
 params["disease_health_impact"] = 4.29
 
 # whether or not people can die natural deaths
-params["allow_natural_deaths"] = True
+params["allow_natural_deaths"] = False
 
 # this is multiplied with the infection chance when a person is in this type of object
 object_infection_modifiers = {}
