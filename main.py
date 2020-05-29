@@ -2,22 +2,22 @@ from sim import InfectSim
 import matplotlib.pyplot as plt
 import json
 
-sim_name = "bigone_new"
-mapfile = "map9090.png"
+sim_name = "test"
+mapfile = "map.png"
 
 params = {"mapfile": mapfile}
 
 # number of days to simulate
-params["sim_days"] = 40
+params["sim_days"] = 20
 
 # inhabitants in the world
-params["num_inhabitants"] = 4000
+params["num_inhabitants"] = 400
 
 # number of infected inhabitants at the beginning of the simulation
 params["initial_infected"] = 10
 
 # length of each day in frames
-params["day_length"] = 800
+params["day_length"] = 500
 
 # ratio of inhabitants who are active workers
 params["worker_ratio"] = 0.6
@@ -33,7 +33,7 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.11
+params["infection_chance"] = 0.3
 
 # how many days the infection lasts on average
 params["infection_length"] = 5

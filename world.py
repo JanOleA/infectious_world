@@ -1123,7 +1123,8 @@ class Person(Actor):
         self._params["became_immune"] = 0
         self._params["died"] = 0
         self._params["age"] = 0
-        self._params["health"] = 5
+        self._params["base_health"] = 5
+        self._params["health_modifiers"] = {}
         self._params["allow_natural_deaths"] = True
         self._infection_duration = 0
 
@@ -1134,15 +1135,14 @@ class Person(Actor):
                 and self._params["infection_status"] != 4):
             if self._params["infection_status"] == 1:
                 self._params["infection_status"] = 3 # died from infection
-                self._params["color"] = "black"
+                self._params["color"] = "grey"
                 self._params["died"] = global_time
             elif self._params["allow_natural_deaths"]:
                 self._params["infection_status"] = 4 # natural death
-                self._params["color"] = "black"
+                self._params["color"] = "grey"
                 self._params["died"] = global_time
             
             
-
         if self._params["infection_status"] == 1:
             self._infection_duration += 1
             if self._infection_duration > self._infection_length:
@@ -1150,7 +1150,8 @@ class Person(Actor):
                 self._params["infection_status"] = 2
                 self._params["color"] = "green"
                 self._params["became_immune"] = global_time
-                self._params["health"] = self._params["health"] + self._disease_health_impact
+                if "infection" in self._params["health_modifiers"]:
+                    del self._params["health_modifiers"]["infection"]
                 self._infection_duration = 0
 
         if self._params["infection_status"] != 3 and self._params["infection_status"] != 4:
@@ -1162,8 +1163,7 @@ class Person(Actor):
     def set_infected(self, infection_length = 100, health_impact = 3):
         self._params["infection_status"] = 1
         self._params["color"] = "red"
-        self._params["health"] = self._params["health"] - health_impact
-        self._disease_health_impact = health_impact
+        self._params["health_modifiers"]["infection"] = -health_impact
         self._infection_duration = 0
         self._infection_length = infection_length + np.random.randint(int(infection_length/20) + 1) - int(infection_length/40)
 
@@ -1188,10 +1188,15 @@ class Person(Actor):
         modifier -- multiplied directly with the chance (default = 0.1)
         inf_rate -- where the chance to die is infinite (default = -1.0)
         """
-        health = self._params["health"]
+        health = self.health
         if health < inf_rate+1e-3:
             return np.inf
         else:
             return 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
 
-
+    @property
+    def health(self):
+        h = self._params["base_health"]
+        for key, item in self._params["health_modifiers"].items():
+            h += item
+        return h
