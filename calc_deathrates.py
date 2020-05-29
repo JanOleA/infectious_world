@@ -7,10 +7,16 @@ def inverse_deathrate(rate, modifier = 0.1, inf_rate = -1):
     return health
 
 def death_rate(health, modifier = 0.1, inf_rate = -1):
+    if isinstance(health, np.ndarray):
+        rate = 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
+        rate[health < inf_rate+1e-3] = np.inf
+        return rate
+        
     if health < inf_rate+1e-3:
         return np.inf
     else:
         return 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
+
 
 if __name__ == "__main__":
     wanted_rate = float(input("Enter a death rate (for disease duration) > "))

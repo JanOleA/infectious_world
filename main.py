@@ -2,8 +2,8 @@ from sim import InfectSim
 import matplotlib.pyplot as plt
 import json
 
-sim_name = "test"
-mapfile = "map.png"
+sim_name = "bigone_new"
+mapfile = "map9090.png"
 
 params = {"mapfile": mapfile}
 
@@ -11,13 +11,13 @@ params = {"mapfile": mapfile}
 params["sim_days"] = 40
 
 # inhabitants in the world
-params["num_inhabitants"] = 600
+params["num_inhabitants"] = 4000
 
 # number of infected inhabitants at the beginning of the simulation
 params["initial_infected"] = 10
 
 # length of each day in frames
-params["day_length"] = 500
+params["day_length"] = 800
 
 # ratio of inhabitants who are active workers
 params["worker_ratio"] = 0.6
@@ -33,7 +33,7 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.2
+params["infection_chance"] = 0.11
 
 # how many days the infection lasts on average
 params["infection_length"] = 5
@@ -48,7 +48,7 @@ params["lockdown_chance"] = 0
 # params["lockdown_break_chance"] = 0.1 TODO: Implement
 
 # how much the disease will reduce the health of an infected person
-params["disease_health_impact"] = 4.29
+params["disease_health_impact"] = 3.84557
 
 # whether or not people can die natural deaths
 params["allow_natural_deaths"] = False
@@ -66,7 +66,7 @@ with open(f"sim_params/{sim_name}.json", "w") as outfile:
     json.dump(params, outfile, indent = 4)
 
 simulation = InfectSim(mapfile, params, sim_name)
-simulation.calculate_R0(iterations = 3)
+simulation.calculate_R0(iterations = 5)
 simulation.run_sim()
 simulation.make_infection_heatmap()
 simulation.plot_infection_heatmap()
