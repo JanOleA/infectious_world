@@ -87,7 +87,7 @@ def plot_SIR_graph(state_history, day_length, max_frames, R_history, infection_l
 
 plot_SIR_graph(state_history, day_length, max_frames, R_history, params["infection_length"])
 
-anim_size = np.array(map_.T.shape*np.array([1,0.5]))/len(map_[1])*plot_width
+anim_size = np.array(map_.T.shape*np.array([1,0.5]) + np.array([1,0]))/len(map_[1])*plot_width
 fig, axs = plt.subplots(1, 2, figsize = anim_size.astype(int))
 
 ax = axs[0]
@@ -95,9 +95,8 @@ ax = axs[0]
 ax.imshow(np.array(im)[::-1])
         
 ax.set_ylim(-1, map_.shape[0])
-ax.set_xlim(-1, map_.shape[1])
-
 ax.axis("equal")
+ax.set_xlim(-2, map_.shape[1])
 
 initial_positions = position_history[0]
 time_start = time.time()

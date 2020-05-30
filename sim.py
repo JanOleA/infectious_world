@@ -6,7 +6,6 @@ import time
 from world import World
 from calc_deathrates import death_rate
 import seaborn as sns
-import time
 import os
 
 
@@ -34,6 +33,9 @@ class InfectSim:
         self.lockdown_chance = params["lockdown_chance"]
         self.disease_health_impact = params["disease_health_impact"]
         self.allow_natural_deaths = params["allow_natural_deaths"]
+        self.life_expectancy = params["life_expectancy"]
+        self.rebirth_chance = params["rebirth_chance"]
+        self.allow_rebirths = params["allow_rebirths"]
 
         self.expected_death_rate = death_rate(5 - self.disease_health_impact)*self.infection_length
 
@@ -42,6 +44,7 @@ class InfectSim:
         print(f"the disease an expected death rate of {self.expected_death_rate:.4f}.")
 
         self.im = Image.open(mapfile)
+        self.mapfile = mapfile
         self.map_array = np.array(self.im)
 
         self.sim_name = sim_name
@@ -58,7 +61,10 @@ class InfectSim:
                            infection_length = self.infection_length,
                            object_infection_modifiers = self.object_infection_modifiers,
                            disease_health_impact = self.disease_health_impact,
-                           allow_natural_deaths = self.allow_natural_deaths)
+                           allow_natural_deaths = self.allow_natural_deaths,
+                           life_expectancy = self.life_expectancy,
+                           rebirth_chance = self.rebirth_chance, 
+                           allow_rebirths = self.allow_rebirths)
 
         max_frames = self.max_frames
         day_length = self.day_length
@@ -336,10 +342,11 @@ class InfectSim:
         if max_frames is None:
             max_frames = self.max_frames
 
-        anim_size = np.array(map_.T.shape)/len(map_[1])*plot_width
+        anim_size = np.array(map_.T.shape + np.array([1,0]))/len(map_[1])*plot_width
         fig, ax = plt.subplots(figsize = anim_size.astype(int))
 
         self.world.plot_world(ax = ax)
+        ax.set_xlim(left = -2)
 
         initial_positions = self.position_history[0]
 

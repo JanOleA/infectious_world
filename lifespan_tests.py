@@ -1,13 +1,11 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-expected_lifespan = 10
+expected_lifespan = 21
 
 def age_health(age, five_divisor = 10, zero_point = 21):
-    a = -5*five_divisor/(1 - five_divisor)
-    b = -a/zero_point**3
-    health = a + b*age**3
-    return np.maximum(np.minimum(20, health), -0.5)
+    health = ((age/zero_point)**3 - 1)*5*five_divisor/(1-five_divisor)
+    return np.maximum(np.minimum(20, health), -0.5)/5
 
 def death_rate(health, modifier = 0.1, inf_rate = -1):
     if isinstance(health, np.ndarray):
@@ -20,17 +18,24 @@ def death_rate(health, modifier = 0.1, inf_rate = -1):
     else:
         return 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
 
-ages = np.linspace(0, expected_lifespan * 1.5, 1000)
-age_healths = age_health(ages, zero_point = expected_lifespan)
-death_rates = death_rate(age_healths)
+fig, axs = plt.subplots(1, 2, figsize = (14,8))
 
-plt.plot(ages, death_rates, label = "death rate")
-plt.xlabel("age")
-plt.legend()
-plt.figure()
-plt.plot(ages, age_healths, label = "health")
-plt.xlabel("age")
-plt.legend()
+for div in range(-5, 12):
+    if div == 1:
+        continue
+    ages = np.linspace(0, expected_lifespan * 1.5, 1000)
+    age_healths = age_health(ages, five_divisor = div, zero_point = expected_lifespan)
+    death_rates = death_rate(age_healths*5)
+
+    axs[0].plot(ages, death_rates, label = f"death rate | div = {div}")
+    axs[0].set_xlabel("age")
+
+    axs[1].plot(ages, age_healths, label = f"health multiplier | div = {div}")
+    axs[1].set_xlabel("age")
+
+axs[0].legend()
+axs[1].legend()
+
 
 class Person:
     def __init__(self):
@@ -39,14 +44,14 @@ class Person:
 
     def age_one(self):
         roll = np.random.random()
-        if roll < death_rate(age_health(self.age, zero_point = expected_lifespan))/4:
+        if roll < death_rate(age_health(self.age, five_divisor = 20, zero_point = expected_lifespan)*5)/4:
             self.dead = True
             return self.age
         else:
             self.age += 0.25
             return None
 
-N = 10000
+N = 1000
 people = []
 
 for i in range(N):

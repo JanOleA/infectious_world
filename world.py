@@ -21,7 +21,10 @@ class World:
                  infection_length = 2,
                  object_infection_modifiers = None,
                  disease_health_impact = 3,
-                 allow_natural_deaths = True):
+                 allow_natural_deaths = True,
+                 life_expectancy = 21,
+                 rebirth_chance = 0, 
+                 allow_rebirths = False):
 
         """ Initialize the world and all parameters, generate the map and
         initialize the inhabitants
@@ -43,6 +46,9 @@ class World:
         disease_health_impact -- the health effect having the disease will have on an infected person
                                  see the 'death chance' method on the Person object for details
         allow_natural_deaths -- whether or not people can die even if they are not infected
+        life_expectancy -- approximately how long the people in the sim can expect to live
+        rebirth_chance -- chance each day that a dead person can be reborn, multiplied with the fraction of people that
+                          are currently dead
         """
 
         in_map = in_map[::-1]
@@ -61,6 +67,10 @@ class World:
         self._infection_length_frames = infection_length*day_length
         self._disease_health_impact = disease_health_impact
         self._allow_natural_deaths = allow_natural_deaths
+        self._life_expectancy = life_expectancy
+        self._rebirth_chance = rebirth_chance
+        self._allow_rebirths = allow_rebirths
+        self._tot_dead = None
 
         if object_infection_modifiers is None:
             object_infection_modifiers = {}
@@ -183,7 +193,7 @@ class World:
             else:
                 house = np.random.choice(self._house_list)
 
-            new_person = Person(house.position[0], house.position[1], house, self._map, self._day_length)
+            new_person = Person(house.position[0], house.position[1], house, self._map, self._day_length, self._life_expectancy)
 
             for j, workplace in enumerate(self._workplace_list):
                 workplace_distances[j] = np.linalg.norm(new_person.position - workplace.position)
@@ -195,6 +205,7 @@ class World:
             new_person.set_workplace(self._map, workplace)
             if work_rolls[i] < self._worker_ratio:
                 new_person.set_param("active_worker", True)
+            new_person.set_param("age", np.random.randint(int(self._life_expectancy/2)))
             new_person.set_preferred_commonarea(self._commonarea_list)
             new_person.set_param("allow_natural_deaths", self._allow_natural_deaths)
             house.add_dweller(new_person)
@@ -207,7 +218,8 @@ class World:
 
         for i in initial_infect_inds:
             actor = self._actors_list[i]
-            actor.set_infected(infection_length = self._infection_length_frames)
+            actor.set_infected(infection_length = self._infection_length_frames,
+                               health_impact = self._disease_health_impact)
             self._actor_params[i] = actor.params
 
         print(" "*len(s), end = "\r")
@@ -217,6 +229,38 @@ class World:
         self._actor_plotpositions = np.array(self._actor_plotpositions, dtype=np.float64)
         self._actor_params = np.array(self._actor_params)
         self._recovered_stats = np.zeros((self._num_actors, 2))
+
+
+    def birth_new(self, old_actor, actor_index, work_roll):
+        """ Removes an actor from the simulation and replaces it with a new one
+        with an age of 0
+        """
+        old_house = old_actor.homeplace
+        old_house.remove_dweller(old_actor)
+        new_house = np.random.choice(self._house_list)
+        workplace_distances = np.zeros(len(self._workplace_list))
+
+        new_person = Person(new_house.position[0], new_house.position[1], new_house, self._map, self._day_length, self._life_expectancy)
+
+        for j, workplace in enumerate(self._workplace_list):
+            workplace_distances[j] = np.linalg.norm(new_person.position - workplace.position)
+
+        workplace_distances_inv = np.max(workplace_distances) - workplace_distances
+        workplace_chances = workplace_distances_inv/np.sum(workplace_distances_inv)
+        
+        workplace = np.random.choice(self._workplace_list, p = workplace_chances)
+        new_person.set_workplace(self._map, workplace)
+
+        if work_roll < self._worker_ratio:
+            new_person.set_param("active_worker", True)
+
+        new_person.set_preferred_commonarea(self._commonarea_list)
+        new_person.set_param("allow_natural_deaths", self._allow_natural_deaths)
+        new_house.add_dweller(new_person)
+        self._actors_list[actor_index] = new_person
+        self._actor_positions[actor_index] = new_person.position
+        self._actor_plotpositions[actor_index] = new_person.plotpos
+        self._actor_params[actor_index] = new_person.params
 
 
     def frame_forward(self):
@@ -246,20 +290,29 @@ class World:
                 self._recovered_stats[i] = (actor_params["infected_others"], actor_params["died"])
 
             params = actor.params
-            state = params["infection_status"]
-            states[int(state)] += 1
+            state = int(params["infection_status"])
+            states[state] += 1
             colors.append(params["color"])
 
             roll = behavior_rolls[i]
 
-            behavior = actor.params["behavior"]
+            if state == 3 or state == 4:
+                if (roll < (self._rebirth_chance/self._day_length)
+                          *(self._tot_dead/self._num_actors)):
+                    if self._allow_rebirths:
+                        self.birth_new(actor, i, death_roll) # remove the dead actor and create a new one
+                        states[state] -= 1
+                        states[0] += 1
 
-            # this is where the next behavior of the actor is set for the next frame
-            if behavior == "normal":
-                self._normal_actor_behaviour(actor, roll, day_time)
-            elif behavior == "stay_home":
-                self._stay_home_behaviour(actor, roll, day_time)
+            else:
+                behavior = actor.params["behavior"]
+                # this is where the next behavior of the actor is set for the next frame
+                if behavior == "normal":
+                    self._normal_actor_behaviour(actor, roll, day_time)
+                elif behavior == "stay_home":
+                    self._stay_home_behaviour(actor, roll, day_time)
 
+        self._tot_dead = states[3] + states[4]
 
         self._global_time += 1
 
@@ -445,6 +498,7 @@ class World:
             actor.reset()
             if work_rolls[i] < self._worker_ratio:
                 actor.set_param("active_worker", True)
+            actor.set_param("age", np.random.randint(int(self._life_expectancy/2)))
             actor.set_param("allow_natural_deaths", self._allow_natural_deaths)
             self._recovered_stats[i] = (0,0)
             self._actor_params[i] = actor.params
@@ -459,7 +513,8 @@ class World:
 
         for i in initial_infect_inds:
             actor = self._actors_list[i]
-            actor.set_infected(infection_length = self._infection_length_frames)
+            actor.set_infected(infection_length = self._infection_length_frames,
+                               health_impact = self._disease_health_impact)
             self._actor_params[i] = actor.params
 
 
@@ -623,6 +678,11 @@ class House(MapObject):
     def add_dweller(self, actor):
         self._dwellers.append(actor)
         self._N += 1
+
+
+    def remove_dweller(self, actor):
+        self._dwellers.remove(actor)
+        self.remove_actor(actor)
 
 
     def get_dwellers(self):
@@ -1099,13 +1159,14 @@ class Actor:
 
 
 class Person(Actor):
-    def __init__(self, xhome, yhome, homeplace, map_, day_length, image_map = None):
+    def __init__(self, xhome, yhome, homeplace, map_, day_length, exp_lifespan, image_map = None):
         super().__init__(xhome, yhome, homeplace, map_, day_length, image_map)
         self._name = names.get_full_name()
+        self._expected_lifespan = exp_lifespan
 
 
     def _init_params(self):
-        self._params["color"] = "cyan"
+        self._params["color"] = "c"
         # infection status values:
         # 0 = susceptible
         # 1 = infected
@@ -1126,20 +1187,26 @@ class Person(Actor):
         self._params["base_health"] = 5
         self._params["health_modifiers"] = {}
         self._params["allow_natural_deaths"] = True
+        self._death_plotpos_offset = (np.random.random(size=2)-0.5)/3
         self._infection_duration = 0
+        d = 10 # used for the lifespan calculation, can be tuned
+        self._lifespan_a = 5*d/(1 - d)
 
 
     def frame_forward(self, global_time, death_roll):
+        if self._params["infection_status"] == 3 or self._params["infection_status"] == 4:
+            return self.position # dead
+
         if (death_roll < self.death_chance/self._day_length
                 and self._params["infection_status"] != 3
                 and self._params["infection_status"] != 4):
             if self._params["infection_status"] == 1:
                 self._params["infection_status"] = 3 # died from infection
-                self._params["color"] = "grey"
+                self._params["color"] = "k"
                 self._params["died"] = global_time
             elif self._params["allow_natural_deaths"]:
                 self._params["infection_status"] = 4 # natural death
-                self._params["color"] = "grey"
+                self._params["color"] = "k"
                 self._params["died"] = global_time
             
             
@@ -1148,21 +1215,20 @@ class Person(Actor):
             if self._infection_duration > self._infection_length:
                 """ become immune """
                 self._params["infection_status"] = 2
-                self._params["color"] = "green"
+                self._params["color"] = "g"
                 self._params["became_immune"] = global_time
                 if "infection" in self._params["health_modifiers"]:
                     del self._params["health_modifiers"]["infection"]
                 self._infection_duration = 0
 
+        self._params["age"] += 1/self._day_length
         if self._params["infection_status"] != 3 and self._params["infection_status"] != 4:
             return Actor.frame_forward(self, global_time)
-        else:
-            return self.position # dead
 
 
     def set_infected(self, infection_length = 100, health_impact = 3):
         self._params["infection_status"] = 1
-        self._params["color"] = "red"
+        self._params["color"] = "r"
         self._params["health_modifiers"]["infection"] = -health_impact
         self._infection_duration = 0
         self._infection_length = infection_length + np.random.randint(int(infection_length/20) + 1) - int(infection_length/40)
@@ -1170,6 +1236,17 @@ class Person(Actor):
     
     def __str__(self):
         return self._name
+
+
+    @property
+    def plotpos(self):
+        """ Return a position slightly offset to differentiate persons in animation.
+        If dead, show the person off to the side of the map.
+        """
+        if self._params["infection_status"] != 3 and self._params["infection_status"] != 4:
+            return super().plotpos
+        else:
+            return np.array([-1, self._yhome]) + self._death_plotpos_offset
 
     @property
     def death_chance(self, modifier = 0.1, inf_rate = -1):
@@ -1194,9 +1271,26 @@ class Person(Actor):
         else:
             return 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
 
+
+    @property
+    def age_health_multiplier(self):
+        """ Calculates a modifier for the health based on the persons age, the
+        formula is:
+        
+        modifier = ((age/lifespan)**3 - 1)*lifespan_a
+        see the init_params method for definition of lifespan_a
+
+        the modifier is cropped to be within (-0.5, 20), and then divided by 5
+        """
+        lifespan = self._expected_lifespan
+        age = self._params["age"]
+        modifier = ((age/lifespan)**3 - 1)*self._lifespan_a
+        return np.maximum(np.minimum(20, modifier), -0.5)/5
+
+
     @property
     def health(self):
-        h = self._params["base_health"]
+        h = self._params["base_health"]*self.age_health_multiplier
         for key, item in self._params["health_modifiers"].items():
             h += item
         return h
