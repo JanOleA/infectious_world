@@ -201,7 +201,7 @@ class InteractiveSim(InfectSim):
             rate_string = f"{expected_death_rate:1.3f}"
         self.text_death_chance = self.font.render(f"Exp. death rate: {rate_string}", True, self.WHITE)
 
-        self._clock.tick_busy_loop(30)
+        self._clock.tick_busy_loop(60)
         self.fps = self._clock.get_fps()
 
         self.text_fps = self.font.render(f"fps = {self.fps:3.1f}", True, self.WHITE)
