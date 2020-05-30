@@ -119,7 +119,7 @@ class InteractiveSim(InfectSim):
                                    mod_func=self.world.set_infection_chance))
 
         self.buttons = []
-        self.buttons.append(Button(5, self.height - 40, 160, 30, "Reset", self.world.reset))
+        self.buttons.append(Button(5, self.height - 40, 160, 30, "Reset", self.WHITE, self.RED, self.world.reset))
 
         self.history_fig = plt.figure(figsize = (1.6, 1.6), dpi = 100)
         self.history_ax = plt.axes([0,0,1,1], frameon=False)
@@ -210,7 +210,7 @@ class InteractiveSim(InfectSim):
             text_x = bg.centerx - trect.width/2
             text_y = bg.centery - trect.height/2
 
-            pygame.draw.rect(self._screen, self.WHITE, bg)
+            pygame.draw.rect(self._screen, button.bg_color, bg)
             self._screen.blit(text, (text_x, text_y))
 
         for pos, color in zip(self.positions, self.colors):
@@ -345,7 +345,7 @@ class Slider:
 
 
 class Button:
-    def __init__(self, left, top, width, height, text, act_func):
+    def __init__(self, left, top, width, height, text, text_color, bg_color, act_func):
         self.width = width
         self.height = height
         self.center = (left + width/2, top + height/2)
@@ -355,7 +355,8 @@ class Button:
         self.act_func = act_func
         self.pressed = False
         font = pygame.font.SysFont('Calibri', 17)
-        self.text = font.render(text, True, (0,0,0))
+        self.text = font.render(text, True, text_color)
+        self.bg_color = bg_color
 
 
     def is_inside(self, x, y = None):
