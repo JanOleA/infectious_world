@@ -232,8 +232,9 @@ class World:
 
     def birth_new(self, old_actor, actor_index, work_roll):
         """ Removes an actor from the simulation and replaces it with a new one
-        with an age of 0
+        with an age of 0. Retains the behavior from the old actor.
         """
+        old_behavior = old_actor.params["behavior"]
         old_house = old_actor.homeplace
         old_house.remove_dweller(old_actor)
         new_house = np.random.choice(self._house_list)
@@ -255,6 +256,7 @@ class World:
 
         new_person.set_preferred_commonarea(self._commonarea_list)
         new_person.set_param("allow_natural_deaths", self._allow_natural_deaths)
+        new_person.set_param("behavior", old_behavior)
         new_house.add_dweller(new_person)
         self._actors_list[actor_index] = new_person
         self._actor_positions[actor_index] = new_person.position
