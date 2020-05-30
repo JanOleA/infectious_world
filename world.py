@@ -453,6 +453,11 @@ class World:
         return self._actor_plotpositions.copy()
 
 
+    def set_infection_chance(self, chance):
+        self._infection_chance = chance
+        self._infection_chance_per_frame = chance/self.day_length
+
+
     def get_actor_params(self):
         return self._actor_params.copy()
 
@@ -553,6 +558,10 @@ class World:
     @property
     def day_length(self):
         return self._day_length
+
+    @property
+    def infection_chance(self):
+        return self._infection_chance
 
 
 class MapObject:

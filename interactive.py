@@ -7,6 +7,7 @@ import time
 import os
 import json
 
+
 class InteractiveSim(InfectSim):
     def __init__(self, mapfile, params, sim_name):
         super().__init__(mapfile, params, sim_name)
@@ -34,14 +35,6 @@ class InteractiveSim(InfectSim):
         self.RED = (255, 0, 0)
         self.UI_BG = (100, 100, 100)
 
-        pygame.font.init()
-        self.font = pygame.font.SysFont('Calibri', 15)
-
-        self.text_susceptible = self.font.render(f"Susceptible: {0}", True, self.WHITE)
-        self.text_numinfected = self.font.render(f"Infected: {0}", True, self.WHITE)
-        self.text_recovered = self.font.render(f"Recovered: {0}", True, self.WHITE)
-        self.text_dead = self.font.render(f"Dead: {0}", True, self.WHITE)
-
 
     def on_init(self):
         pygame.init()
@@ -62,10 +55,23 @@ class InteractiveSim(InfectSim):
             self._sprites[i].set_colorkey((255,0,255))
             self._sprites[i] = pygame.transform.scale(self._sprites[i], (9, 15))
 
+        
         self.current_infected = self.initial_infected
         self.lockdown_initiated = False
         self.ui_rect = pygame.Rect(0,0,self._rightshift,800)
- 
+
+        pygame.font.init()
+        self.font = pygame.font.SysFont('Calibri', 17)
+
+        self.text_susceptible = self.font.render(f"Susceptible: {self.num_inhabitants - self.initial_infected}", True, self.WHITE)
+        self.text_numinfected = self.font.render(f"Infected: {self.current_infected}", True, self.WHITE)
+        self.text_recovered = self.font.render(f"Recovered: {0}", True, self.WHITE)
+        self.text_dead = self.font.render(f"Dead: {0}", True, self.WHITE)
+        self.text_infection_chance = self.font.render(f"Infection chance: {0}", True, self.WHITE)
+
+        self.sliders = []
+        self.sliders.append(Slider(5, 140, 160, 30, lval = 0.001, cval = 0.4, rval = 1.5, func="square", plot_func=True))
+
 
     def on_event(self, event):
         if event.type == pygame.QUIT:
@@ -73,10 +79,16 @@ class InteractiveSim(InfectSim):
 
 
     def on_loop(self):
-        i = self._i
         self.states, self.colors = self.world.frame_forward()
         self.positions = self.world.get_actor_plotpositions()
         self.recovered_stats = self.world.get_recovered_stats()
+
+        if pygame.mouse.get_pressed()[0] == True:
+            pos = pygame.mouse.get_pos()
+            for slider in self.sliders:
+                if slider.is_inside(pos):
+                    slider.set_button_x(pos[0])
+                    self.world.set_infection_chance(slider.get_value())
 
         current_infected = self.states[1]
         if (current_infected / self.num_inhabitants > self.lockdown_ratio
@@ -84,10 +96,12 @@ class InteractiveSim(InfectSim):
             self.world.set_behaviors("stay_home", self.lockdown_chance)
             lockdown_initiated = True
 
-        self.text_susceptible = self.font.render(f"Susceptible: {self.states[0]}", True, self.WHITE)
-        self.text_numinfected = self.font.render(f"Infected: {self.states[1]}", True, self.WHITE)
-        self.text_recovered = self.font.render(f"Recovered: {self.states[2]}", True, self.WHITE)
-        self.text_dead = self.font.render(f"Dead: {self.states[3] + self.states[4]}", True, self.WHITE)
+        self.text_susceptible = self.font.render(f"Susceptible: {int(self.states[0])}", True, self.WHITE)
+        self.text_numinfected = self.font.render(f"Infected: {int(self.states[1])}", True, self.WHITE)
+        self.text_recovered = self.font.render(f"Recovered: {int(self.states[2])}", True, self.WHITE)
+        self.text_dead = self.font.render(f"Dead: {int(self.states[3] + self.states[4])}", True, self.WHITE)
+        self.text_infection_chance = self.font.render(f"Infection chance: {self.world.infection_chance:3.3g}", True, self.WHITE)
+
         self._i += 1
                     
 
@@ -99,6 +113,12 @@ class InteractiveSim(InfectSim):
         self._screen.blit(self.text_numinfected, (5, 30))
         self._screen.blit(self.text_recovered, (5, 50))
         self._screen.blit(self.text_dead, (5, 70))
+        self._screen.blit(self.text_infection_chance, (5, 120))
+
+        for slider in self.sliders:
+            bg, button = slider()
+            pygame.draw.rect(self._screen, self.BLACK, bg)
+            pygame.draw.rect(self._screen, self.WHITE, button)
 
         for pos, color in zip(self.positions, self.colors):
             x = pos[0]*self.map_scale - 4 + self._rightshift + self.map_scale/2
@@ -116,7 +136,7 @@ class InteractiveSim(InfectSim):
         pygame.display.flip()
 
 
-    def on_cleanup(self):
+    def cleanup(self):
         pygame.quit()
  
 
@@ -129,8 +149,100 @@ class InteractiveSim(InfectSim):
                 self.on_event(event)
             self.on_loop()
             self.on_render()
-        self.on_cleanup()
- 
+        self.cleanup()
+
+
+class Slider:
+    def __init__(self,
+                 left,
+                 top,
+                 width,
+                 height,
+                 lval = 0,
+                 cval = 50,
+                 rval = 100,
+                 func = "linear",
+                 bwidth = 10,
+                 plot_func = False):
+
+        self.width = width
+        self.height = height
+        self.center = (left + width/2, top + height/2)
+        self.left = left
+        self.top = top
+        self.bgrect = pygame.Rect(left, top, width, height)
+        self.button = pygame.Rect(left, top, bwidth, height*0.8)
+        self.bwidth = bwidth
+
+        self.lval = lval
+        self.cval = cval
+        self.rval = rval
+
+        self.leftmost_x = left + bwidth*1.1
+        self.center_x = self.center[0]
+        self.rightmost_x = left + width - bwidth*1.1
+
+        self.set_button_pos(self.center)
+
+        if func == "square":
+            self.c = lval
+            self.b = 4*cval - 3*lval - rval
+            self.a = rval - self.b - lval
+            self.retfunc = self.squarefunc
+        else:
+            self.retfunc = self.linearfunc
+
+        if plot_func:
+            x_test = np.linspace(self.leftmost_x,self.rightmost_x,100)
+            plt.plot(x_test, self.retfunc(x_test))
+            plt.show()
+
+
+    def linearfunc(self, x):
+        val = x - self.leftmost_x
+        val /= (self.rightmost_x - self.leftmost_x)
+        return val*self.rval + self.lval
+
+    
+    def squarefunc(self, x):
+        val = x - self.leftmost_x
+        val /= (self.rightmost_x - self.leftmost_x)
+        return self.a*val**2 + self.b*val + self.c
+
+    
+    def set_button_pos(self, x, y = None):
+        if y is None:
+            x, y = x
+        self.button.center = (x, y)
+
+
+    def set_button_x(self, x):
+        if abs(x - self.center[0]) < self.bwidth/3:
+            x = self.center[0]
+        self.button.centerx = max(min(x, self.rightmost_x), self.leftmost_x)
+
+
+    def is_inside(self, x, y = None):
+        if y is None:
+            x, y = x
+        if self.left < x < self.left + self.width:
+            if self.top < y < self.top + self.height:
+                return True
+        return False
+
+    
+    def get_value(self):
+        return self.retfunc(self.button.centerx)
+
+
+    def __call__(self):
+        return self.bgrect, self.button
+
+
+class Button:
+    def __init__(self):
+        """ """
+
 
 if __name__ == "__main__":
     sim_name = "test"
