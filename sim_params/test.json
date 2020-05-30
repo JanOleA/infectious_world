@@ -11,7 +11,7 @@
     "infection_chance": 0.4,
     "infection_length": 5,
     "lockdown_ratio": 1,
-    "lockdown_chance": 0,
+    "lockdown_chance": 0.8,
     "disease_health_impact": 3.84557,
     "allow_natural_deaths": true,
     "life_expectancy": 20,

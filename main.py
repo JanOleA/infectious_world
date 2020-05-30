@@ -42,7 +42,7 @@ params["infection_length"] = 5
 params["lockdown_ratio"] = 1
 
 # chance for any inhabitant to go into lockdown when it is put into effect
-params["lockdown_chance"] = 0
+params["lockdown_chance"] = 0.8
 
 # chance for any inhabitant in lockdown to return to normal behavior on any day
 # params["lockdown_break_chance"] = 0.1 TODO: Implement

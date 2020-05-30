@@ -7,6 +7,7 @@ import matplotlib
 import time
 import os
 import json
+from calc_deathrates import inverse_deathrate, death_rate
 
 matplotlib.use("Agg")
 import matplotlib.backends.backend_agg as agg
@@ -72,6 +73,10 @@ class InteractiveSim(InfectSim):
         self.raw_data_historyplot = self.renderer.tostring_rgb()
 
 
+    def set_health_impact_from_rate(self, rate):
+        health_impact = 5 - inverse_deathrate(rate/self.infection_length)
+        self.world.set_infection_health_impact(health_impact)
+
 
     def on_init(self):
         pygame.init()
@@ -111,15 +116,22 @@ class InteractiveSim(InfectSim):
         self.text_recovered = self.font.render(f"Recovered: {0}", True, self.WHITE)
         self.text_dead = self.font.render(f"Dead: {0}", True, self.WHITE)
         
-        self.text_infection_chance = self.font.render(f"Infection chance: {0}", True, self.WHITE)
-
         self.sliders = []
+
+        self.text_infection_chance = self.font.render(f"Infection chance: {0}", True, self.WHITE)
         self.sliders.append(Slider(5, 170, 160, 30,
-                                   lval = 0.001, cval = 0.4, rval = 1.5, func="square",
+                                   lval = self.infection_chance/100, cval = self.infection_chance, rval = self.infection_chance*4, func="square",
                                    mod_func=self.world.set_infection_chance))
+
+        self.text_death_chance = self.font.render(f"Exp. death rate: {0}", True, self.WHITE)
+        self.sliders.append(Slider(5, 240, 160, 30,
+                                   lval = 1e-5, cval = self.expected_death_rate, rval = 3, func="linear",
+                                   mod_func=self.set_health_impact_from_rate))
 
         self.buttons = []
         self.buttons.append(Button(5, self.height - 40, 160, 30, "Reset", self.WHITE, self.RED, self.world.reset))
+        self.buttons.append(Button(5, self.height - 260, 160, 30, "Initiate lockdown", self.BLACK, self.WHITE, self.initiate_lockdown))
+        self.buttons.append(Button(5, self.height - 300, 160, 30, "Deactivate lockdown", self.BLACK, self.WHITE, self.deactivate_lockdown))
 
         self.history_fig = plt.figure(figsize = (1.6, 1.6), dpi = 100)
         self.history_ax = plt.axes([0,0,1,1], frameon=False)
@@ -150,11 +162,13 @@ class InteractiveSim(InfectSim):
         self.states_prev2days = np.roll(self.states_prev2days, -1, axis = 0)
         self.states_prev2days[-1] = self.states
 
+        self.keys = pygame.key.get_pressed()
+
         if pygame.mouse.get_pressed()[0] == True:
             pos = pygame.mouse.get_pos()
             for slider in self.sliders:
                 if slider.is_inside(pos):
-                    mod_func = slider.set_button_x(pos[0])
+                    mod_func = slider.set_button_x(pos[0], self.keys)
                     mod_func(slider.get_value())
 
             for button in self.buttons:
@@ -173,11 +187,19 @@ class InteractiveSim(InfectSim):
 
         day = self.world.global_time/self.day_length
         self.text_day = self.font_big.render(f"Day: {day:2.2f}", True, self.WHITE)
+
         self.text_susceptible = self.font.render(f"Susceptible: {int(self.states[0])}", True, self.WHITE)
         self.text_numinfected = self.font.render(f"Infected: {int(self.states[1])}", True, self.WHITE)
         self.text_recovered = self.font.render(f"Recovered: {int(self.states[2])}", True, self.WHITE)
         self.text_dead = self.font.render(f"Dead: {int(self.states[3] + self.states[4])}", True, self.WHITE)
+
         self.text_infection_chance = self.font.render(f"Infection chance: {self.world.infection_chance:3.3g}", True, self.WHITE)
+        expected_death_rate = death_rate(5 - self.world.disease_health_impact)*self.infection_length
+        if expected_death_rate < 1e-3:
+            rate_string = f"{expected_death_rate:1.2e}"
+        else:
+            rate_string = f"{expected_death_rate:1.3f}"
+        self.text_death_chance = self.font.render(f"Exp. death rate: {rate_string}", True, self.WHITE)
 
         self._clock.tick_busy_loop(30)
         self.fps = self._clock.get_fps()
@@ -197,6 +219,7 @@ class InteractiveSim(InfectSim):
         self._screen.blit(self.text_recovered, (5, 80))
         self._screen.blit(self.text_dead, (5, 100))
         self._screen.blit(self.text_infection_chance, (5, 150))
+        self._screen.blit(self.text_death_chance, (5, 220))
         self._screen.blit(self.text_fps, (self.size[0] + self._rightshift - self.text_fps.get_rect().width - 10, 10))
 
         for slider in self.sliders:
@@ -231,7 +254,7 @@ class InteractiveSim(InfectSim):
             self.animated_SIR_plot()
             plot_size = self.canvas.get_width_height()
             self.plot_surf = pygame.image.fromstring(self.raw_data_historyplot, plot_size, "RGB")
-        self._screen.blit(self.plot_surf, (5,580))
+        self._screen.blit(self.plot_surf, (5,590))
 
         pygame.display.flip()
 
@@ -263,7 +286,6 @@ class Slider:
                  rval = 100,
                  func = "linear",
                  bwidth = 10,
-                 plot_func = False,
                  mod_func = None):
 
         self.width = width
@@ -295,16 +317,14 @@ class Slider:
         else:
             self.retfunc = self.linearfunc
 
-        if plot_func:
-            x_test = np.linspace(self.leftmost_x,self.rightmost_x,100)
-            plt.plot(x_test, self.retfunc(x_test))
-            plt.show()
-
 
     def linearfunc(self, x):
         val = x - self.leftmost_x
         val /= (self.rightmost_x - self.leftmost_x)
-        return val*self.rval + self.lval
+        if val < 0.5:
+            return (val*2)*self.cval + self.lval
+        else:
+            return (val - 0.5)*(self.rval - self.cval)*2 + self.cval
 
     
     def squarefunc(self, x):
@@ -319,9 +339,10 @@ class Slider:
         self.button.center = (x, y)
 
 
-    def set_button_x(self, x):
-        if abs(x - self.center[0]) < self.bwidth/3:
-            x = self.center[0]
+    def set_button_x(self, x, keys):
+        if not keys[306] and not keys[305]:
+            if abs(x - self.center[0]) < self.bwidth/3:
+                x = self.center[0]
         self.button.centerx = max(min(x, self.rightmost_x), self.leftmost_x)
 
         return self.mod_func

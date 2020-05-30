@@ -88,6 +88,14 @@ class InfectSim:
         self.recovered_stats = None
     
 
+    def initiate_lockdown(self):
+        self.world.set_behaviors("stay_home", self.lockdown_chance)
+
+    
+    def deactivate_lockdown(self):
+        self.world.set_behaviors("normal")
+
+
     def run_sim(self, max_frames = None):
         if max_frames is None:
             max_frames = self.max_frames
@@ -115,7 +123,7 @@ class InfectSim:
             current_infected = self.state_history[i + 1][1]
             if (current_infected / self.num_inhabitants > self.lockdown_ratio
                     and not lockdown_initiated):
-                self.world.set_behaviors("stay_home", self.lockdown_chance)
+                self.initiate_lockdown()
                 lockdown_initiated = True
 
             if self.world.global_time > R_eval_time:

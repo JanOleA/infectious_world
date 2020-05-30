@@ -213,7 +213,7 @@ class World:
             self._actor_plotpositions.append(new_person.plotpos)
             self._actor_params.append(new_person.params)
 
-        initial_infect_inds = np.random.choice(np.arange(self._num_actors), self._initial_infected)
+        initial_infect_inds = np.random.choice(np.arange(self._num_actors), self._initial_infected, replace = False)
 
         for i in initial_infect_inds:
             actor = self._actors_list[i]
@@ -380,7 +380,7 @@ class World:
                 actor.set_motion(actor.homeplace)
 
 
-    def set_behaviors(self, new_behavior, chance):
+    def set_behaviors(self, new_behavior, chance = 1):
         """ reset all actors to normal behavior, then set the new behavior with
         the given chance
         """
@@ -457,6 +457,12 @@ class World:
         self._infection_chance_per_frame = chance/self.day_length
 
 
+    def set_infection_health_impact(self, health_impact):
+        self._disease_health_impact = health_impact
+        for actor in self._actors_list:
+            actor.set_disease_health_impact(health_impact)
+
+
     def get_actor_params(self):
         return self._actor_params.copy()
 
@@ -513,7 +519,7 @@ class World:
                 item.reset()
         self._global_time = 0
 
-        initial_infect_inds = np.random.choice(np.arange(self._num_actors), self._initial_infected)
+        initial_infect_inds = np.random.choice(np.arange(self._num_actors), self._initial_infected, replace = False)
 
         for i in initial_infect_inds:
             actor = self._actors_list[i]
@@ -561,6 +567,10 @@ class World:
     @property
     def infection_chance(self):
         return self._infection_chance
+
+    @property
+    def disease_health_impact(self):
+        return self._disease_health_impact
 
 
 class MapObject:
@@ -1245,6 +1255,12 @@ class Person(Actor):
     def __str__(self):
         return self._name
 
+
+    def set_disease_health_impact(self, health_impact):
+        """ Change the health impact of the disease if the person is currently sick """
+        if "infection" in self._params["health_modifiers"]:
+            self._params["health_modifiers"]["infection"] = -health_impact
+            
 
     @property
     def plotpos(self):
