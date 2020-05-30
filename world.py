@@ -3,7 +3,6 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from matplotlib import animation
 from PIL import Image
-import random
 import time
 import names
 

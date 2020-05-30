@@ -1,7 +1,7 @@
 {
     "mapfile": "map.png",
     "sim_days": 50,
-    "num_inhabitants": 400,
+    "num_inhabitants": 500,
     "initial_infected": 10,
     "day_length": 500,
     "worker_ratio": 0.6,
