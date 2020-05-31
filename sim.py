@@ -31,6 +31,7 @@ class InfectSim:
         self.object_infection_modifiers = params["object_infection_modifiers"]
         self.lockdown_ratio = params["lockdown_ratio"]
         self.lockdown_chance = params["lockdown_chance"]
+        self.infected_stay_home_chance = params["infected_stay_home_chance"]
         self.disease_health_impact = params["disease_health_impact"]
         self.allow_natural_deaths = params["allow_natural_deaths"]
         self.life_expectancy = params["life_expectancy"]
@@ -43,7 +44,7 @@ class InfectSim:
         print(f"an infection length of {self.infection_length}. With a normal health of 5 this gives ", end = "")
         print(f"the disease an expected death rate of {self.expected_death_rate:.4f}.")
 
-        self.im = Image.open(mapfile)
+        self.im = Image.open(f"{os.getcwd()}/{mapfile}")
         self.mapfile = mapfile
         self.map_array = np.array(self.im)
 
@@ -60,6 +61,7 @@ class InfectSim:
                            initial_infected = self.initial_infected,
                            infection_length = self.infection_length,
                            object_infection_modifiers = self.object_infection_modifiers,
+                           infected_stay_home_chance = self.infected_stay_home_chance,
                            disease_health_impact = self.disease_health_impact,
                            allow_natural_deaths = self.allow_natural_deaths,
                            life_expectancy = self.life_expectancy,
@@ -103,8 +105,8 @@ class InfectSim:
         R0 = np.nan
         s = ""
 
-        R_eval_time = int(self.infection_length*self.day_length*1.1)
-        R0_max_time = int(self.infection_length*self.day_length*1.2)
+        R_eval_time = int(self.infection_length*self.day_length*1)
+        R0_max_time = int(self.infection_length*self.day_length*1.1)
         gfactor_interval = int(self.day_length)
 
         current_infected = self.initial_infected
@@ -191,8 +193,8 @@ class InfectSim:
         R0 = np.nan
         s = ""
 
-        R_eval_time = int(self.infection_length*self.day_length*1.1)
-        R0_max_time = int(self.infection_length*self.day_length*1.2)
+        R_eval_time = int(self.infection_length*self.day_length*1)
+        R0_max_time = int(self.infection_length*self.day_length*1.1)
 
         R0_list = []
 

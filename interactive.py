@@ -119,14 +119,19 @@ class InteractiveSim(InfectSim):
         self.sliders = []
 
         self.text_infection_chance = self.font.render(f"Infection chance: {0}", True, self.WHITE)
-        self.sliders.append(Slider(5, 170, 160, 30,
+        self.sliders.append(Slider(5, 170, 160, 20,
                                    lval = self.infection_chance/100, cval = self.infection_chance, rval = self.infection_chance*4, func="square",
                                    mod_func=self.world.set_infection_chance))
 
         self.text_death_chance = self.font.render(f"Exp. death rate: {0}", True, self.WHITE)
-        self.sliders.append(Slider(5, 240, 160, 30,
+        self.sliders.append(Slider(5, 220, 160, 20,
                                    lval = 1e-5, cval = self.expected_death_rate, rval = 3, func="linear",
                                    mod_func=self.set_health_impact_from_rate))
+
+        self.text_stay_home_chance = self.font.render(f"Stay home chance: {0}", True, self.WHITE)
+        self.sliders.append(Slider(5, 270, 160, 20,
+                                   lval = 0, cval = self.infected_stay_home_chance, rval = 1, func="linear",
+                                   mod_func=self.world.set_infected_stay_home_chance))
 
         self.buttons = []
         self.buttons.append(Button(5, self.height - 40, 160, 30, "Reset", self.WHITE, self.RED, self.world.reset))
@@ -155,9 +160,14 @@ class InteractiveSim(InfectSim):
 
 
     def loop(self):
+        store_index = (self._i + 1)%self.max_frames
         self.states, self.colors = self.world.frame_forward()
         self.positions = self.world.get_actor_plotpositions()
         self.recovered_stats = self.world.get_recovered_stats()
+
+        self.state_history[store_index] = self.states
+        self.color_history[store_index] = self.colors
+        self.position_history[store_index] = self.positions
 
         self.states_prev2days = np.roll(self.states_prev2days, -1, axis = 0)
         self.states_prev2days[-1] = self.states
@@ -201,6 +211,8 @@ class InteractiveSim(InfectSim):
             rate_string = f"{expected_death_rate:1.3f}"
         self.text_death_chance = self.font.render(f"Exp. death rate: {rate_string}", True, self.WHITE)
 
+        self.text_stay_home_chance = self.font.render(f"Stay home chance: {self.world.infected_stay_home_chance:3.3g}", True, self.WHITE)
+
         self._clock.tick_busy_loop(60)
         self.fps = self._clock.get_fps()
 
@@ -219,7 +231,8 @@ class InteractiveSim(InfectSim):
         self._screen.blit(self.text_recovered, (5, 80))
         self._screen.blit(self.text_dead, (5, 100))
         self._screen.blit(self.text_infection_chance, (5, 150))
-        self._screen.blit(self.text_death_chance, (5, 220))
+        self._screen.blit(self.text_death_chance, (5, 200))
+        self._screen.blit(self.text_stay_home_chance, (5, 250))
         self._screen.blit(self.text_fps, (self.size[0] + self._rightshift - self.text_fps.get_rect().width - 10, 10))
 
         for slider in self.sliders:
@@ -261,6 +274,26 @@ class InteractiveSim(InfectSim):
 
     def cleanup(self):
         pygame.quit()
+
+        self.map = self.world.get_map()
+
+        if not os.path.exists(f"{os.getcwd()}/output"):
+            os.mkdir(f"{os.getcwd()}/output")
+        if not os.path.exists(f"{os.getcwd()}/output/{self.sim_name}"):
+            os.mkdir(f"{os.getcwd()}/output/{self.sim_name}")
+
+        self.output_dir = f"{os.getcwd()}/output/{self.sim_name}"
+
+        output_data = [self.map,
+                       self.im,
+                       self.position_history,
+                       self.state_history,
+                       self.color_history,
+                       self.day_length,
+                       self.R_history]
+
+        print("Saving data...")
+        np.save(f"{self.output_dir}/data.npy", output_data)
  
 
     def execute(self):
@@ -394,11 +427,12 @@ class Button:
 
 
 if __name__ == "__main__":
-    sim_name = "test"
-    mapfile = "map.png"
+    sim_name = "interactive"
 
-    with open(f"sim_params/{sim_name}.json", "r") as infile:
+    with open(f"{os.getcwd()}/sim_params/{sim_name}.json", "r") as infile:
         params = json.load(infile)
+
+    mapfile = params["mapfile"]
     
     interactive_sim = InteractiveSim(mapfile, params, sim_name)
     interactive_sim.execute()

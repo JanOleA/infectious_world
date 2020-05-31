@@ -1,6 +1,6 @@
 {
     "mapfile": "map.png",
-    "sim_days": 20,
+    "sim_days": 8,
     "num_inhabitants": 500,
     "initial_infected": 10,
     "day_length": 500,
@@ -13,7 +13,7 @@
     "lockdown_ratio": 1,
     "lockdown_chance": 0.9,
     "lockdown_break_chance": 0.1,
-    "infected_stay_home_chance": 0,
+    "infected_stay_home_chance": 0.1,
     "disease_health_impact": 4.18288,
     "allow_natural_deaths": true,
     "life_expectancy": 20,

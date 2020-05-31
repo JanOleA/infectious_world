@@ -19,6 +19,7 @@ class World:
                  initial_infected = 10,
                  infection_length = 2,
                  object_infection_modifiers = None,
+                 infected_stay_home_chance = 0.1,
                  disease_health_impact = 3,
                  allow_natural_deaths = True,
                  life_expectancy = 21,
@@ -42,6 +43,8 @@ class World:
         infection_length -- length of infection in days (default 2)
         object_infection_modifiers -- dictionary containing modifiers for infection rate in each object type
                                       if None, all are set to 1 (default None)
+        infected_stay_at_home_chance -- the chance that an infected person will decide to go into isolation on
+                                        the beginning of each day and stay there until they are healthy
         disease_health_impact -- the health effect having the disease will have on an infected person
                                  see the 'death chance' method on the Person object for details
         allow_natural_deaths -- whether or not people can die even if they are not infected
@@ -64,12 +67,13 @@ class World:
         self._initial_infected = initial_infected
         self._infection_length_days = infection_length
         self._infection_length_frames = infection_length*day_length
+        self._infected_stay_home_chance = infected_stay_home_chance
         self._disease_health_impact = disease_health_impact
         self._allow_natural_deaths = allow_natural_deaths
         self._life_expectancy = life_expectancy
         self._rebirth_chance = rebirth_chance
         self._allow_rebirths = allow_rebirths
-        self._tot_dead = None
+        self._tot_dead = 0
 
         if object_infection_modifiers is None:
             object_infection_modifiers = {}
@@ -204,7 +208,7 @@ class World:
             new_person.set_workplace(self._map, workplace)
             if work_rolls[i] < self._worker_ratio:
                 new_person.set_param("active_worker", True)
-            new_person.set_param("age", np.random.randint(int(self._life_expectancy/2)))
+            new_person.set_param("age", np.random.randint(int(self._life_expectancy - 1)))
             new_person.set_preferred_commonarea(self._commonarea_list)
             new_person.set_param("allow_natural_deaths", self._allow_natural_deaths)
             house.add_dweller(new_person)
@@ -217,6 +221,7 @@ class World:
 
         for i in initial_infect_inds:
             actor = self._actors_list[i]
+            actor.set_param("age", 0)
             actor.set_infected(infection_length = self._infection_length_frames,
                                health_impact = self._disease_health_impact)
             self._actor_params[i] = actor.params
@@ -268,7 +273,7 @@ class World:
         """ Step one frame forward in the simulation """
         day_time = self._global_time%self._day_length
         behavior_rolls = np.random.random(size = self._num_actors)
-        death_rolls = np.random.random(size = self._num_actors)
+        second_rolls = np.random.random(size = self._num_actors)
 
         states = np.zeros(5)
         colors = []
@@ -277,8 +282,8 @@ class World:
 
         ### this loop defines the main behaviour of persons in this world
         for i, actor in enumerate(self._actors_list):
-            death_roll = death_rolls[i]
-            actor_pos = actor.frame_forward(self._global_time, death_roll) # this is where the actor actually does their behavior
+            second_roll = second_rolls[i]
+            actor_pos = actor.frame_forward(self._global_time, second_roll) # this is where the actor actually does their behavior
             self._actor_positions[i] = actor_pos
             self._actor_plotpositions[i] = actor.plotpos
             actor_params = actor.params
@@ -301,7 +306,7 @@ class World:
                 if (roll < (self._rebirth_chance/self._day_length)
                           *(self._tot_dead/self._num_actors)):
                     if self._allow_rebirths:
-                        self.birth_new(actor, i, death_roll) # remove the dead actor and create a new one
+                        self.birth_new(actor, i, second_roll) # remove the dead actor and create a new one
                         states[state] -= 1
                         states[0] += 1
 
@@ -309,9 +314,9 @@ class World:
                 behavior = actor.params["behavior"]
                 # this is where the next behavior of the actor is set for the next frame
                 if behavior == "normal":
-                    self._normal_actor_behaviour(actor, roll, day_time)
+                    self._normal_actor_behaviour(actor, roll, second_roll, day_time)
                 elif behavior == "stay_home":
-                    self._stay_home_behaviour(actor, roll, day_time)
+                    self._stay_home_behaviour(actor, roll, second_roll, day_time)
 
         self._tot_dead = states[3] + states[4]
 
@@ -320,7 +325,15 @@ class World:
         return states, colors
 
 
-    def _normal_actor_behaviour(self, actor, roll, day_time):
+    def _normal_actor_behaviour(self, actor, roll, second_roll, day_time):
+        if actor.params["infection_isolating"]:
+            return self._stay_home_behaviour(actor, roll, second_roll, day_time)
+        elif (day_time == 0
+                and second_roll < self._infected_stay_home_chance
+                and actor.params["infection_status"] == 1):
+            actor.set_param("infection_isolating", True)
+            return self._stay_home_behaviour(actor, roll, second_roll, day_time)
+
         if actor.params["active_worker"]:
             if actor.status == "idle":
                 ### Leave home for work in the morning
@@ -376,7 +389,7 @@ class World:
                     actor.set_motion(actor.homeplace)
 
 
-    def _stay_home_behaviour(self, actor, roll, day_time):
+    def _stay_home_behaviour(self, actor, roll, second_roll, day_time):
         if not actor.is_home:
             if not actor.current_path_goal == actor.homeplace:
                 actor.set_motion(actor.homeplace)
@@ -465,6 +478,10 @@ class World:
             actor.set_disease_health_impact(health_impact)
 
 
+    def set_infected_stay_home_chance(self, chance):
+        self._infected_stay_home_chance = chance
+
+
     def get_actor_params(self):
         return self._actor_params.copy()
 
@@ -510,7 +527,7 @@ class World:
             actor.reset()
             if work_rolls[i] < self._worker_ratio:
                 actor.set_param("active_worker", True)
-            actor.set_param("age", np.random.randint(int(self._life_expectancy/2)))
+            actor.set_param("age", np.random.randint(int(self._life_expectancy - 2)))
             actor.set_param("allow_natural_deaths", self._allow_natural_deaths)
             self._recovered_stats[i] = (0,0)
             self._actor_params[i] = actor.params
@@ -525,6 +542,7 @@ class World:
 
         for i in initial_infect_inds:
             actor = self._actors_list[i]
+            actor.set_param("age", 0)
             actor.set_infected(infection_length = self._infection_length_frames,
                                health_impact = self._disease_health_impact)
             self._actor_params[i] = actor.params
@@ -573,6 +591,10 @@ class World:
     @property
     def disease_health_impact(self):
         return self._disease_health_impact
+
+    @property
+    def infected_stay_home_chance(self):
+        return self._infected_stay_home_chance
 
 
 class MapObject:
@@ -1200,6 +1222,7 @@ class Person(Actor):
         self._params["basic_speed"] = 0.45
 
         self._params["behavior"] = "normal"
+        self._params["infection_isolating"] = False # if True the person will almost always stay at home
         self._params["infected_others"] = 0
         self._params["became_immune"] = 0
         self._params["died"] = 0
@@ -1219,7 +1242,8 @@ class Person(Actor):
 
         if (death_roll < self.death_chance/self._day_length
                 and self._params["infection_status"] != 3
-                and self._params["infection_status"] != 4):
+                and self._params["infection_status"] != 4
+                and global_time > self._day_length/10):
             if self._params["infection_status"] == 1:
                 self._params["infection_status"] = 3 # died from infection
                 self._params["color"] = "k"
@@ -1228,12 +1252,14 @@ class Person(Actor):
                 self._params["infection_status"] = 4 # natural death
                 self._params["color"] = "k"
                 self._params["died"] = global_time
+            return self.position # dead
             
             
         if self._params["infection_status"] == 1:
             self._infection_duration += 1
             if self._infection_duration > self._infection_length:
                 """ become immune """
+                self._params["infection_isolating"] = False
                 self._params["infection_status"] = 2
                 self._params["color"] = "g"
                 self._params["became_immune"] = global_time
