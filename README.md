@@ -1,4 +1,13 @@
 # Infection spread simulator
+#### Requried packages:
+- pygame (only if running the interactive version)
+- numpy
+- matplotlib
+- json
+- PIL (pillow)
+- names
+- seaborn
+
 ## Various premade modes for the interactive version:
 In the top of the interactive.py file there are two settings:
 - sim\_name
@@ -26,12 +35,3 @@ The R0 calculation can be inaccurate, especially if one or more of the following
 - The disease length is short
 - The simulation is small
 - The real R0 is very high
-
-#### Requried packages:
-- pygame (only if running the interactive version)
-- numpy
-- matplotlib
-- json
-- PIL (pillow)
-- names
-- seaborn
