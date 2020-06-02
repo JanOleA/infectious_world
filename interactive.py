@@ -19,7 +19,7 @@ class InteractiveSim(InfectSim):
     def __init__(self, mapfile, params, sim_name):
         super().__init__(mapfile, params, sim_name)
         self._running = True
-        self._display_surf = None
+        self._screen = None
         self.map_size = self.map_array.shape[:2]
         self.height = 800
         self.map_scale = self.height/self.map_size[0]
@@ -29,7 +29,10 @@ class InteractiveSim(InfectSim):
         self._i = 0
 
         self._rightshift = 200
+        self._rightextend = 300
         self._downshift = 0
+        self._max_len_deathlist = int((self.height + self._downshift)/20) - 2
+        self._deathlist = []
 
         self.states = None
         self.colors = None
@@ -46,6 +49,8 @@ class InteractiveSim(InfectSim):
         self.WHITE = (255, 255, 255)
         self.GREEN = (0, 255, 0)
         self.RED = (255, 0, 0)
+        self.DARKREDPURPLE = (144, 0, 34)
+        self.LIGHTGREY = (200, 200, 200)
         self.UI_BG = (100, 100, 100)
 
 
@@ -78,10 +83,15 @@ class InteractiveSim(InfectSim):
         self.world.set_infection_health_impact(health_impact)
 
 
+    def reset(self):
+        self._deathlist = []
+        self.world.reset()
+
+
     def on_init(self):
         pygame.init()
         pygame.display.set_caption("Infection spread simulator")
-        self._screen = pygame.display.set_mode((self.size[0] + self._rightshift, self.size[1] + self._downshift), pygame.HWSURFACE | pygame.DOUBLEBUF)
+        self._screen = pygame.display.set_mode((self.size[0] + self._rightshift + self._rightextend, self.size[1] + self._downshift), pygame.HWSURFACE | pygame.DOUBLEBUF)
         self._running = True
 
         self._clock = pygame.time.Clock()
@@ -96,17 +106,18 @@ class InteractiveSim(InfectSim):
                          "person_dead.png"]
 
         for i in range(len(person_images)):
-            self._sprites.append(pygame.image.load(f"graphics/{person_images[i]}").convert())
+            self._sprites.append(pygame.image.load(f"{os.getcwd()}/graphics/{person_images[i]}").convert())
             self._sprites[i].set_colorkey((255,0,255))
-            self._sprites[i] = pygame.transform.scale(self._sprites[i], (9, 15))
+            self._sprites[i] = pygame.transform.scale(self._sprites[i], (20, 20))
 
         
         self.current_infected = self.initial_infected
         self.lockdown_initiated = False
-        self.ui_rect = pygame.Rect(0,0,self._rightshift,800)
+        self.ui_rect = pygame.Rect(0,0,self._rightshift + self.width + self._rightextend, 800)
 
         pygame.font.init()
         self.font = pygame.font.SysFont('Calibri', 17)
+        self.font_small = pygame.font.SysFont('Calibri', 14)
         self.font_big = pygame.font.SysFont('Calibri', 20)
 
         self.text_day = self.font_big.render(f"Day: {0}", True, self.WHITE)
@@ -115,6 +126,8 @@ class InteractiveSim(InfectSim):
         self.text_numinfected = self.font.render(f"Infected: {self.current_infected}", True, self.WHITE)
         self.text_recovered = self.font.render(f"Recovered: {0}", True, self.WHITE)
         self.text_dead = self.font.render(f"Dead: {0}", True, self.WHITE)
+
+        self.text_dead_title = self.font.render(f"Most recent deaths:", True, self.WHITE)
         
         self.sliders = []
 
@@ -134,9 +147,9 @@ class InteractiveSim(InfectSim):
                                    mod_func=self.world.set_infected_stay_home_chance))
 
         self.buttons = []
-        self.buttons.append(Button(5, self.height - 40, 160, 30, "Reset", self.WHITE, self.RED, self.world.reset))
-        self.buttons.append(Button(5, self.height - 260, 160, 30, "Initiate lockdown", self.BLACK, self.WHITE, self.initiate_lockdown))
-        self.buttons.append(Button(5, self.height - 300, 160, 30, "Deactivate lockdown", self.BLACK, self.WHITE, self.deactivate_lockdown))
+        self.buttons.append(Button(5, self.height - 40, 160, 30, "Reset", self.WHITE, self.RED, self.DARKREDPURPLE, self.reset))
+        self.buttons.append(Button(5, self.height - 260, 160, 30, "Initiate lockdown", self.BLACK, self.WHITE, self.LIGHTGREY, self.initiate_lockdown))
+        self.buttons.append(Button(5, self.height - 300, 160, 30, "Deactivate lockdown", self.BLACK, self.WHITE, self.LIGHTGREY, self.deactivate_lockdown))
 
         self.history_fig = plt.figure(figsize = (1.6, 1.6), dpi = 100)
         self.history_ax = plt.axes([0,0,1,1], frameon=False)
@@ -160,7 +173,7 @@ class InteractiveSim(InfectSim):
 
 
     def loop(self):
-        store_index = (self._i + 1)%self.max_frames
+        store_index = (self.world.global_time + 1)%self.max_frames
         self.states, self.colors = self.world.frame_forward()
         self.positions = self.world.get_actor_plotpositions()
         self.recovered_stats = self.world.get_recovered_stats()
@@ -213,7 +226,7 @@ class InteractiveSim(InfectSim):
 
         self.text_stay_home_chance = self.font.render(f"Stay home chance: {self.world.infected_stay_home_chance:3.3g}", True, self.WHITE)
 
-        self._clock.tick_busy_loop(60)
+        self._clock.tick_busy_loop(30)
         self.fps = self._clock.get_fps()
 
         self.text_fps = self.font.render(f"fps = {self.fps:3.1f}", True, self.WHITE)
@@ -246,12 +259,12 @@ class InteractiveSim(InfectSim):
             text_x = bg.centerx - trect.width/2
             text_y = bg.centery - trect.height/2
 
-            pygame.draw.rect(self._screen, button.bg_color, bg)
+            pygame.draw.rect(self._screen, button.color, bg)
             self._screen.blit(text, (text_x, text_y))
 
-        for pos, color in zip(self.positions, self.colors):
-            x = pos[0]*self.map_scale - 4 + self._rightshift + self.map_scale/2
-            y = self.height - (pos[1] + 1)*self.map_scale - 8 + self._downshift + self.map_scale/2
+        for pos, color, actor in zip(self.positions, self.colors, self.world.get_actors()):
+            x = pos[0]*self.map_scale - 10 + self._rightshift + self.map_scale/2
+            y = self.height - (pos[1] + 1)*self.map_scale - 10 + self._downshift + self.map_scale/2
             if color == "c":
                 img = self._sprites[0]
             elif color == "r":
@@ -261,7 +274,27 @@ class InteractiveSim(InfectSim):
             elif color == "k":
                 img = self._sprites[3]
 
+            if actor.params["infection_status"] == 3 or actor.params["infection_status"] == 4:
+                if not actor in self._deathlist:
+                    self._deathlist.append(actor)
+
             self._screen.blit(img, (x,y))
+
+        
+
+        x = self._rightshift + self.width + 5
+        self._screen.blit(self.text_dead_title, (x, 10))
+        y = 35
+        for person in self._deathlist[-self._max_len_deathlist:]:
+            if person.params["infection_status"] == 3:
+                infection = "yes"
+            else:
+                infection = "no"
+            text_dead = self.font_small.render(f"{str(person)}, age: {person.params['age']:2.1f}, infected: {infection}", True, self.WHITE)
+            self._screen.blit(text_dead, (x, y))
+            y += 20
+            
+
 
         if self._i%10 == 0:
             self.animated_SIR_plot()
@@ -399,7 +432,7 @@ class Slider:
 
 
 class Button:
-    def __init__(self, left, top, width, height, text, text_color, bg_color, act_func):
+    def __init__(self, left, top, width, height, text, text_color, bg_color, bg_pressed_color, act_func):
         self.width = width
         self.height = height
         self.center = (left + width/2, top + height/2)
@@ -411,6 +444,7 @@ class Button:
         font = pygame.font.SysFont('Calibri', 17)
         self.text = font.render(text, True, text_color)
         self.bg_color = bg_color
+        self.bg_pressed_color = bg_pressed_color
 
 
     def is_inside(self, x, y = None):
@@ -421,6 +455,13 @@ class Button:
                 return True
         return False
     
+
+    @property
+    def color(self):
+        if self.pressed:
+            return self.bg_pressed_color
+        else:
+            return self.bg_color
 
     def __call__(self):
         return self.bgrect, self.text

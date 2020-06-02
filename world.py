@@ -1012,6 +1012,27 @@ class Actor:
         self._params["color"] = color
     
 
+    def _h(self, position, target_position):
+        """ Heuristic function for A* algorithm. Estimates the shortest
+        possible distance to the target position.
+        position and target_position must be Numpy arrays
+        """
+        return np.linalg.norm(target_position - position)
+
+
+    def _reconstruct_path(self, target):
+        """ Finalize the path for the A* algorithm 
+        returns the finished path as a list of road objects
+        """
+        path = [target]
+        current = target
+        while current.camefrom is not None:
+            path.append(current.camefrom)
+            current = current.camefrom
+
+        return path[::-1]
+
+
     def find_path(self, map_, target, start = None):
         """ A* algorithm for pathfinding """
         target_position = target.position
@@ -1089,27 +1110,6 @@ class Actor:
             self._params[param] += value
         else:
             print(f"Attempted to increase param {param} for object {self} with value {value}, but key does not exist...")
-
-
-    def _h(self, position, target_position):
-        """ Heuristic function for A* algorithm. Estimates the shortest
-        possible distance to the target position.
-        position and target_position must be Numpy arrays
-        """
-        return np.linalg.norm(target_position - position)
-
-
-    def _reconstruct_path(self, target):
-        """ Finalize the path for the A* algorithm 
-        returns the finished path as a list of road objects
-        """
-        path = [target]
-        current = target
-        while current.camefrom is not None:
-            path.append(current.camefrom)
-            current = current.camefrom
-
-        return path[::-1]
 
 
     def plot_world(self):
