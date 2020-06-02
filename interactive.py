@@ -9,11 +9,15 @@ import os
 import json
 from calc_deathrates import inverse_deathrate, death_rate
 
+### Settings ###
+sim_name = "interactive"
+show_death_list = True
+### End setttings ###
+
 matplotlib.use("Agg")
 import matplotlib.backends.backend_agg as agg
 
 matplotlib.rcParams['savefig.pad_inches'] = 0
-
 
 class InteractiveSim(InfectSim):
     def __init__(self, mapfile, params, sim_name, show_death_list):
@@ -471,9 +475,6 @@ class Button:
 
 
 if __name__ == "__main__":
-    sim_name = "interactive_efficient_nodeath"
-    show_death_list = False
-
     with open(f"{os.getcwd()}/sim_params/{sim_name}.json", "r") as infile:
         params = json.load(infile)
 
