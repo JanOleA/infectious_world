@@ -1323,7 +1323,6 @@ class Person(Actor):
         else:
             return 1/(np.maximum(health, inf_rate+1e-3) - inf_rate)**3*modifier
 
-
     @property
     def age_health_multiplier(self):
         """ Calculates a modifier for the health based on the persons age, the
@@ -1334,11 +1333,12 @@ class Person(Actor):
 
         the modifier is cropped to be within (-0.5, 20), and then divided by 5
         """
+        if not self._params["allow_natural_deaths"]:
+            return 1
         lifespan = self._expected_lifespan
         age = self._params["age"]
         modifier = ((age/lifespan)**3 - 1)*self._lifespan_a
         return np.maximum(np.minimum(20, modifier), -0.5)/5
-
 
     @property
     def health(self):

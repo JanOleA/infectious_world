@@ -16,7 +16,7 @@ matplotlib.rcParams['savefig.pad_inches'] = 0
 
 
 class InteractiveSim(InfectSim):
-    def __init__(self, mapfile, params, sim_name):
+    def __init__(self, mapfile, params, sim_name, show_death_list):
         super().__init__(mapfile, params, sim_name)
         self._running = True
         self._screen = None
@@ -27,9 +27,13 @@ class InteractiveSim(InfectSim):
         self.width = int(self.map_size[1]*self.map_scale)
         self.size = (self.width, self.height) # size of the map
         self._i = 0
+        self.show_death_list = show_death_list
 
         self._rightshift = 200
-        self._rightextend = 300
+        if show_death_list:
+            self._rightextend = 300
+        else:
+            self._rightextend = 0
         self._downshift = 0
         self._max_len_deathlist = int((self.height + self._downshift)/20) - 2
         self._deathlist = []
@@ -281,20 +285,19 @@ class InteractiveSim(InfectSim):
             self._screen.blit(img, (x,y))
 
         
-
-        x = self._rightshift + self.width + 5
-        self._screen.blit(self.text_dead_title, (x, 10))
-        y = 35
-        for person in self._deathlist[-self._max_len_deathlist:]:
-            if person.params["infection_status"] == 3:
-                infection = "yes"
-            else:
-                infection = "no"
-            text_dead = self.font_small.render(f"{str(person)}, age: {person.params['age']:2.1f}, infected: {infection}", True, self.WHITE)
-            self._screen.blit(text_dead, (x, y))
-            y += 20
-            
-
+        if self.show_death_list:
+            x = self._rightshift + self.width + 5
+            self._screen.blit(self.text_dead_title, (x, 10))
+            y = 35
+            for person in self._deathlist[-self._max_len_deathlist:]:
+                if person.params["infection_status"] == 3:
+                    infection = "yes"
+                else:
+                    infection = "no"
+                text_dead = self.font_small.render(f"{str(person)}, age: {person.params['age']:2.1f}, infected: {infection}", True, self.WHITE)
+                self._screen.blit(text_dead, (x, y))
+                y += 20
+                
 
         if self._i%10 == 0:
             self.animated_SIR_plot()
@@ -468,12 +471,13 @@ class Button:
 
 
 if __name__ == "__main__":
-    sim_name = "interactive"
+    sim_name = "interactive_efficient"
+    show_death_list = False
 
     with open(f"{os.getcwd()}/sim_params/{sim_name}.json", "r") as infile:
         params = json.load(infile)
 
     mapfile = params["mapfile"]
     
-    interactive_sim = InteractiveSim(mapfile, params, sim_name)
+    interactive_sim = InteractiveSim(mapfile, params, sim_name, show_death_list)
     interactive_sim.execute()

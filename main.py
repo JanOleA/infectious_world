@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import json
 import os
 
-sim_name = "test"
+sim_name = "interactive_efficient"
 mapfile = "map.png"
 
 params = {"mapfile": mapfile}
@@ -12,7 +12,7 @@ params = {"mapfile": mapfile}
 params["sim_days"] = 20
 
 # inhabitants in the world
-params["num_inhabitants"] = 500
+params["num_inhabitants"] = 300
 
 # number of infected inhabitants at the beginning of the simulation
 params["initial_infected"] = 10
@@ -21,7 +21,7 @@ params["initial_infected"] = 10
 params["day_length"] = 500
 
 # ratio of inhabitants who are active workers
-params["worker_ratio"] = 0.6
+params["worker_ratio"] = 0.7
 
 # the ratio of the days that each person spends working (approx.)
 params["work_length_factor"] = 0.3
@@ -34,10 +34,10 @@ params["home_common_chance"] = 0.005
 
 # expected chance of a person infecting someone if they spend one entire day in the same area together (without any infection modifiers)
 # the actual chance is per frame: infection_chance/day_length
-params["infection_chance"] = 0.5
+params["infection_chance"] = 0.7
 
 # how many days the infection lasts on average
-params["infection_length"] = 3
+params["infection_length"] = 5
 
 # ratio of inhabitants that must be infected for lockdown to be put into effect
 params["lockdown_ratio"] = 1
@@ -50,10 +50,10 @@ params["lockdown_break_chance"] = 0.1 #TODO: Implement
 
 # chance for an infected person to enter a stay home period on the beginning of each day
 # and remain such until the person is healthy
-params["infected_stay_home_chance"] = 0
+params["infected_stay_home_chance"] = 0.05
 
 # how much the disease will reduce the health of an infected person
-params["disease_health_impact"] = 4.18288
+params["disease_health_impact"] = 3
 
 # whether or not people can die natural deaths
 params["allow_natural_deaths"] = True
