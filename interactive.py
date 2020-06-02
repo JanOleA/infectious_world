@@ -142,12 +142,12 @@ class InteractiveSim(InfectSim):
 
         self.text_death_chance = self.font.render(f"Exp. death rate: {0}", True, self.WHITE)
         self.sliders.append(Slider(5, 220, 160, 20,
-                                   lval = 1e-5, cval = self.expected_death_rate, rval = 3, func="linear",
+                                   lval = 0, cval = self.expected_death_rate, rval = 3, func="linear",
                                    mod_func=self.set_health_impact_from_rate))
 
         self.text_stay_home_chance = self.font.render(f"Stay home chance: {0}", True, self.WHITE)
         self.sliders.append(Slider(5, 270, 160, 20,
-                                   lval = 0, cval = self.infected_stay_home_chance, rval = 1, func="linear",
+                                   lval = 1e-15, cval = self.infected_stay_home_chance, rval = 1, func="linear",
                                    mod_func=self.world.set_infected_stay_home_chance))
 
         self.buttons = []
@@ -471,7 +471,7 @@ class Button:
 
 
 if __name__ == "__main__":
-    sim_name = "interactive_efficient"
+    sim_name = "interactive_efficient_nodeath"
     show_death_list = False
 
     with open(f"{os.getcwd()}/sim_params/{sim_name}.json", "r") as infile:
