@@ -1060,7 +1060,6 @@ class Actor:
 
                 return self._reconstruct_path(target)
 
-            ind = open_set.index(current)
             open_set.pop(ind)
             open_set_fscores.pop(ind)
 
@@ -1082,6 +1081,9 @@ class Actor:
                     if neighbor not in open_set:
                         open_set.append(neighbor)
                         open_set_fscores.append(neighbor.fscore)
+                    else:
+                        ind = open_set.index(neighbor)
+                        open_set_fscores[ind] = neighbor.fscore
 
         return False # if no path was found
 
