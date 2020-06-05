@@ -121,6 +121,7 @@ vector<PathFindStruct> Finder::find_path(PathFindStruct start,
     Position current_pos;
     Position neighbor_pos;
     double tentative_gscore;
+    double cost;
     int index;
 
     if (write_to_file) {
@@ -186,7 +187,13 @@ vector<PathFindStruct> Finder::find_path(PathFindStruct start,
                 neighbor = map_grid[other_y][other_x];
                 neighbor_pos = neighbor.pos;
 
-                tentative_gscore = (double)current.gscore + sqrt((double)(i*i) + (double)(j*j))*(double)neighbor.cost;
+                cost = neighbor.cost;
+
+                if (neighbor_pos.x == target.pos.x && neighbor_pos.y == target.pos.y) {
+                    cost = 0.5;
+                }
+
+                tentative_gscore = (double)current.gscore + sqrt((double)(i*i) + (double)(j*j))*cost;
                 
                 if (tentative_gscore < neighbor.gscore) {
                     neighbor.camefrom.x = current_pos.x;
@@ -223,14 +230,14 @@ vector<PathFindStruct> Finder::find_path(PathFindStruct start,
 }
 
 
-vector<vector<int>> Finder::find_path(vector<int> start, vector<int> target) {
+vector<vector<int>> Finder::find_path(vector<int> start_in, vector<int> target_in) {
     /* Takes two vectors of start position and target position as input, and 
     returns a 2D vector containing the path coordinates */
     
-    int start_x = start[0];
-    int start_y = start[1];
-    int target_x = target[0];
-    int target_y = target[1];
+    int start_x = start_in[0];
+    int start_y = start_in[1];
+    int target_x = target_in[0];
+    int target_y = target_in[1];
     PathFindStruct start_ = map_grid_clear[start_y][start_x];
     PathFindStruct target_ = map_grid_clear[target_y][target_x];
 
@@ -248,6 +255,8 @@ vector<vector<int>> Finder::find_path(vector<int> start, vector<int> target) {
     return path;
 }
 
+
+Finder::~Finder() {}
 
 
 vector<vector<PathFindStruct>> Finder::get_map_grid() {

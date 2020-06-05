@@ -38,4 +38,5 @@ public:
     Finder(std::vector<std::vector<int>> map_grid);
     std::vector<std::vector<int>> find_path(std::vector<int> start,
                                             std::vector<int> target);
+    ~Finder();
 };

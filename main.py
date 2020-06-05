@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import json
 import os
 
-sim_name = "interactive_efficient"
+sim_name = "test"
 mapfile = "map.png"
 
 params = {"mapfile": mapfile}
